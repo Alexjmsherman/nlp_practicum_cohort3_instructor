@@ -1,8 +1,8 @@
 # Machine Learning Guild - NLP Practicum
 
 Textbook: 
-- Speech and Language Processing (SLP): https://web.stanford.edu/~jurafsky/slp3/
-- SLP YouTube Videos: https://www.youtube.com/playlist?list=PLQiyVNMpDLKnZYBTUOlSI9mi9wAErFtFm
+- [Speech and Language Processing (SLP):](https://web.stanford.edu/~jurafsky/slp3/)
+- [SLP YouTube Videos:](https://www.youtube.com/playlist?list=PLQiyVNMpDLKnZYBTUOlSI9mi9wAErFtFm)
 
 
 # LESSONS
@@ -22,7 +22,7 @@ Textbook:
 *  Topics: POS tagging, dependency parsing, rule-based matching, phrase dectection
 *  Technology: SpaCy, gensim
 *  Prework: Read section 2.1-2.4 SLP and/or 2.1-2.5 SLP videos
-, section 8.1-8.3 SLP, and chapter 5 Collocations (https://nlp.stanford.edu/fsnlp/promo/colloc.pdf)
+, section 8.1-8.3 SLP, and chapter 5 [Collocations](https://nlp.stanford.edu/fsnlp/promo/colloc.pdf)
 *  Supplementary Material: watch lesson_automation videos
 
 ### 3. Text Vectorization (count-based methods)
@@ -39,7 +39,7 @@ Textbook:
 ### 5. Word Embeddings 
 * Topics: Word2Vec, GloVe, FastText
 * Technology: scikit-learn, gensim
-* Prework: Read section 6.8-6.13 SLP, Efficient Estimation of Word Representations in Vector Space (https://arxiv.org/pdf/1301.3781.pdf) & Distributed Representations of Words and Phrases and their Compositionality (https://arxiv.org/pdf/1310.4546.pdf)
+* Prework: Read section 6.8-6.13 SLP, [Efficient Estimation of Word Representations in Vector Space](https://arxiv.org/pdf/1301.3781.pdf) & [Distributed Representations of Words and Phrases and their Compositionality](https://arxiv.org/pdf/1310.4546.pdf)
 
 ### 6. Deep Learning for NLP
 * Topics: Neural networks with word embeddings, Contextual Word Embeddings
