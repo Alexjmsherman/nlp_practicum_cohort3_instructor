@@ -41,10 +41,10 @@ Conda as a package manager helps you find and install packages. If you need a pa
 
 **create a conda environment with specific packages from a requirements.txt**
 
-	conda create --name guild --file requirements.txt
+	conda env create -f environment.yml
 
-	# FYI - code if you want to create a requirements.txt
-	conda list -e > requirements.txt
+	# FYI - code if you want to create a environment.yml
+	conda env export > environment.yml
 
 
 ### ENVIRONMENTS
