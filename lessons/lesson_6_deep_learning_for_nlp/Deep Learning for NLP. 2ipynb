@@ -1,0 +1,2052 @@
+{
+  "nbformat": 4,
+  "nbformat_minor": 0,
+  "metadata": {
+    "colab": {
+      "name": "Deep Learning for NLP.ipynb",
+      "version": "0.3.2",
+      "provenance": [],
+      "include_colab_link": true
+    },
+    "language_info": {
+      "codemirror_mode": {
+        "name": "ipython",
+        "version": 3
+      },
+      "file_extension": ".py",
+      "mimetype": "text/x-python",
+      "name": "python",
+      "nbconvert_exporter": "python",
+      "pygments_lexer": "ipython3",
+      "version": "3.6.7"
+    },
+    "kernelspec": {
+      "display_name": "Python [conda env:guild] *",
+      "language": "python",
+      "name": "conda-env-guild-py"
+    },
+    "accelerator": "GPU"
+  },
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "view-in-github",
+        "colab_type": "text"
+      },
+      "source": [
+        "<a href=\"https://colab.research.google.com/github/Alexjmsherman/nlp_practicum_cohort3_instructor/blob/master/lessons/lesson_6_deep_learning_for_nlp/Deep%20Learning%20for%20NLP.%202ipynb\" target=\"_parent\"><img src=\"https://colab.research.google.com/assets/colab-badge.svg\" alt=\"Open In Colab\"/></a>"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "yNfyZNVE8c8g",
+        "colab_type": "text"
+      },
+      "source": [
+        "## Deep Learning for NLP\n",
+        "\n",
+        "##### Author: Alex Sherman | alsherman@deloitte.com\n",
+        "\n",
+        "\n",
+        "Agenda:\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "QsPK_oW08c8i",
+        "colab_type": "code",
+        "colab": {}
+      },
+      "source": [
+        "import os\n",
+        "import numpy as np\n",
+        "import pandas as pd\n",
+        "from numpy import array\n",
+        "from numpy import asarray\n",
+        "from numpy import zeros\n",
+        "from IPython.core.display import display, HTML\n",
+        "from IPython.display import Image\n",
+        "from gensim.utils import simple_preprocess\n",
+        "from sklearn.model_selection import train_test_split\n",
+        "from sklearn.linear_model import LogisticRegression\n",
+        "from sklearn import metrics\n",
+        "from sklearn.feature_extraction.text import TfidfVectorizer\n",
+        "from sklearn.metrics import confusion_matrix\n",
+        "import seaborn as sns\n",
+        "from gensim.utils import simple_preprocess\n",
+        "from gensim.models import KeyedVectors\n",
+        "from zipfile import ZipFile "
+      ],
+      "execution_count": 0,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "uM7J88ki8c8l",
+        "colab_type": "code",
+        "outputId": "9d2ffb47-fde3-4d6a-9d32-cb3c1e67e1e3",
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 34
+        }
+      },
+      "source": [
+        "from keras.preprocessing.text import Tokenizer\n",
+        "from keras.preprocessing.sequence import pad_sequences\n",
+        "from keras.models import Sequential\n",
+        "from keras.layers import Dense, Flatten, LSTM, Conv1D, MaxPooling1D, Dropout, Activation, \\\n",
+        "    Embedding, Input, GlobalAveragePooling1D, GlobalMaxPooling1D, SpatialDropout1D, GlobalMaxPool1D\n",
+        "from keras.layers.embeddings import Embedding\n",
+        "from keras.models import Model, Sequential\n",
+        "from keras.initializers import Constant\n",
+        "from keras.utils import to_categorical"
+      ],
+      "execution_count": 5,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "text": [
+            "Using TensorFlow backend.\n"
+          ],
+          "name": "stderr"
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "foYdukBi8c8n",
+        "colab_type": "text"
+      },
+      "source": [
+        "# Problem Definition\n",
+        "\n",
+        "Predict the National Institutes of Health (NIH) Institute of Center (IC) from the Project Title of previously funded projects"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "EeZh4nCh8c8n",
+        "colab_type": "code",
+        "outputId": "9b39ece3-0e67-4bc9-b569-90d5c39260f2",
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 206
+        }
+      },
+      "source": [
+        "# download NIH Project Data\n",
+        "!wget https://exporter.nih.gov/CSVs/final/RePORTER_PRJ_C_FY2017.zip"
+      ],
+      "execution_count": 1,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "text": [
+            "--2019-06-16 00:54:42--  https://exporter.nih.gov/CSVs/final/RePORTER_PRJ_C_FY2017.zip\n",
+            "Resolving exporter.nih.gov (exporter.nih.gov)... 165.112.228.197, 2607:f220:404:1101:165:112:228:197\n",
+            "Connecting to exporter.nih.gov (exporter.nih.gov)|165.112.228.197|:443... connected.\n",
+            "HTTP request sent, awaiting response... 200 OK\n",
+            "Length: 58433518 (56M) [application/x-zip-compressed]\n",
+            "Saving to: ‘RePORTER_PRJ_C_FY2017.zip’\n",
+            "\n",
+            "RePORTER_PRJ_C_FY20 100%[===================>]  55.73M   732KB/s    in 80s     \n",
+            "\n",
+            "2019-06-16 00:56:03 (710 KB/s) - ‘RePORTER_PRJ_C_FY2017.zip’ saved [58433518/58433518]\n",
+            "\n"
+          ],
+          "name": "stdout"
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "q9ktHHDC8c8p",
+        "colab_type": "code",
+        "colab": {}
+      },
+      "source": [
+        "REPORTER_DATA_PATH = r'RePORTER_PRJ_C_FY2017.zip'\n",
+        "\n",
+        "# view the data\n",
+        "df = pd.read_csv(\n",
+        "    REPORTER_DATA_PATH,\n",
+        "    encoding='latin-1'  # common encoding to handle messy data\n",
+        ")\n",
+        "\n",
+        "# filter to relevant columns\n",
+        "df = df[['ADMINISTERING_IC', 'FY',  'IC_NAME', 'PROJECT_TITLE']]\n",
+        "\n",
+        "# convert IC counts to a dataframe\n",
+        "top_ic = df['IC_NAME'].value_counts().reset_index()\n",
+        "\n",
+        "# filter to top ICs\n",
+        "top_ic_names = top_ic[top_ic.IC_NAME > 1500]['index']\n",
+        "\n",
+        "# view new data subset\n",
+        "df = df[df['IC_NAME'].isin(top_ic_names)]\n",
+        "\n",
+        "# set the labels as a new column\n",
+        "df['IC_NUM'] = df['ADMINISTERING_IC'].factorize()[0]\n",
+        "\n",
+        "# create a map of IC nums to names for later reference\n",
+        "ic_name_map = {num:name for num, name in df[['IC_NUM','IC_NAME']].drop_duplicates().values}"
+      ],
+      "execution_count": 0,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "Z3sovYv28c9A",
+        "colab_type": "text"
+      },
+      "source": [
+        "# Preprocess data and create Train/Test splits"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "kEnO8gl_8c9J",
+        "colab_type": "code",
+        "colab": {}
+      },
+      "source": [
+        "def preprocess_text(text):\n",
+        "    \"\"\" use gensim simple_preprocess to tokenize text. Join results back into a clean text string\n",
+        "    \n",
+        "    :param text: string, text to preprocess\n",
+        "    \"\"\"\n",
+        "    \n",
+        "    clean_tokens = simple_preprocess(text)\n",
+        "    clean_text = ' '.join(clean_tokens)\n",
+        "    \n",
+        "    return clean_text"
+      ],
+      "execution_count": 0,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "XSNVrE9E8c9L",
+        "colab_type": "code",
+        "colab": {}
+      },
+      "source": [
+        "# separate the features and response\n",
+        "X = df['PROJECT_TITLE'].apply(lambda x: preprocess_text(x))\n",
+        "y = df['IC_NUM']\n",
+        "\n",
+        "X_train, X_test, y_train, y_test = train_test_split(X, y, shuffle=True, stratify=y, random_state=42)\n",
+        "\n",
+        "# get a count of the number of possible categories to predict\n",
+        "num_classes = len(set(y_train))\n",
+        "\n",
+        "# convert the training and testing dataset\n",
+        "y_train_array = to_categorical(y_train, num_classes)\n",
+        "y_test_array = to_categorical(y_test, num_classes)"
+      ],
+      "execution_count": 0,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "QBwuhx_n8c_h",
+        "colab_type": "text"
+      },
+      "source": [
+        "# Full Embedding and Model Pipeline Class"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "LMSDpD7I8c_l",
+        "colab_type": "code",
+        "colab": {}
+      },
+      "source": [
+        "class EmbeddingModel:\n",
+        "    \n",
+        "    def __init__(self, X_train, X_test, y_train, y_test, \n",
+        "                 max_num_words=20000, max_seq_length=50, embedding_size=50, embedding_dir=None):\n",
+        "                \n",
+        "        # set tokenizer params\n",
+        "        self.max_num_words = max_num_words\n",
+        "        self.max_seq_length = max_seq_length\n",
+        "        self.vocab_size = None\n",
+        "        self.tokenizer = None\n",
+        "\n",
+        "        # format data\n",
+        "        self.num_classes = len(set(y_train))        \n",
+        "        self.y_train_array = to_categorical(y_train, self.num_classes)\n",
+        "        self.y_test_array = to_categorical(y_test, self.num_classes)\n",
+        "        self.X_train = X_train\n",
+        "        self.X_test = X_test\n",
+        "        self.X_train_sequence = self.encode_text(X_train, train=True)\n",
+        "        self.X_test_sequence = self.encode_text(X_test, train=False)\n",
+        "                \n",
+        "        # set embedding params\n",
+        "        self.embedding_dir = embedding_dir\n",
+        "        self.embedding_size = embedding_size\n",
+        "        self.embeddings_index = None\n",
+        "        self.embedding_matrix = None\n",
+        "        \n",
+        "        # set model params\n",
+        "        self.model = None\n",
+        "    \n",
+        "    def setup_model_pipeline(self):\n",
+        "        self.create_embeddings_index()\n",
+        "        self.create_embedding_matrix()\n",
+        "        print('model pipeline set-up complete')\n",
+        "\n",
+        "    def encode_text(self, text, train=False):\n",
+        "        if train:\n",
+        "            self.tokenizer = Tokenizer(num_words=self.max_num_words)\n",
+        "            self.tokenizer.fit_on_texts(text)\n",
+        "\n",
+        "        encoded_docs = self.tokenizer.texts_to_sequences(text)\n",
+        "        padded_docs = pad_sequences(\n",
+        "            encoded_docs,\n",
+        "            maxlen=self.max_seq_length,\n",
+        "            padding='post'\n",
+        "        )\n",
+        "\n",
+        "        print(f'completed tokenizing and padding text - train: {train}')\n",
+        "        self.vocab_size = len(self.tokenizer.word_index) + 1\n",
+        "        return padded_docs\n",
+        "\n",
+        "    def create_embeddings_index(self):\n",
+        "        embeddings_index = {}\n",
+        "\n",
+        "        with open(self.embedding_dir, 'rb') as f:\n",
+        "            for line in f:\n",
+        "                values = line.split()\n",
+        "                word = values[0].decode('utf-8')\n",
+        "                embedding = np.asarray(values[1:], dtype='float32')\n",
+        "                embeddings_index[word] = embedding\n",
+        "\n",
+        "        print('completed creating embedding index')\n",
+        "        self.embeddings_index = embeddings_index\n",
+        "\n",
+        "    def create_embedding_matrix(self):\n",
+        "        embedding_matrix = zeros((self.vocab_size, self.embedding_size))\n",
+        "\n",
+        "        for word, i in self.tokenizer.word_index.items():    \n",
+        "            embedding_vector = self.embeddings_index.get(word)\n",
+        "\n",
+        "            if embedding_vector is not None:\n",
+        "                embedding_matrix[i] = embedding_vector\n",
+        "\n",
+        "        print('completed creating embedding matrix')\n",
+        "        self.embedding_matrix = embedding_matrix\n",
+        "\n",
+        "    def get_embedding_layer(self):\n",
+        "        embedding = Embedding(\n",
+        "            input_dim=self.vocab_size, \n",
+        "            output_dim=self.embedding_size,                                    \n",
+        "            input_length=self.max_seq_length,\n",
+        "            embeddings_initializer=Constant(self.embedding_matrix),\n",
+        "            trainable=False                                   \n",
+        "        )\n",
+        "\n",
+        "        return embedding\n",
+        "\n",
+        "    def fit(self, model=None, epochs=10):\n",
+        "        if model:\n",
+        "            print('using custom model')\n",
+        "        else:\n",
+        "            # default model if a custom model is not provided\n",
+        "            model = Sequential()\n",
+        "            model.add(self.get_embedding_layer())\n",
+        "            model.add(Flatten())\n",
+        "            model.add(Dense(self.num_classes, activation='softmax'))\n",
+        "            model.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])\n",
+        "        \n",
+        "        # train model\n",
+        "        model.fit(\n",
+        "            self.X_train_sequence, \n",
+        "            self.y_train_array,\n",
+        "            epochs=epochs,\n",
+        "            validation_data=(self.X_test_sequence, self.y_test_array)\n",
+        "        )\n",
+        "\n",
+        "        print('completed training model')\n",
+        "        self.model = model\n",
+        "        \n",
+        "    def predict(self, X):\n",
+        "        encoded_text = self.encode_text(X, train=False)\n",
+        "        y_pred = self.model.predict_classes(encoded_text)\n",
+        "        \n",
+        "        return y_pred"
+      ],
+      "execution_count": 0,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "j_meJQUt1Vid",
+        "colab_type": "text"
+      },
+      "source": [
+        "## Download Glove Embeddings"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "PUE4pn_G1nvV",
+        "colab_type": "code",
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 361
+        },
+        "outputId": "9b4cbbec-a9b9-4f57-94d0-57205b86e7f4"
+      },
+      "source": [
+        "# uncomment below for 2GB GLoVe Embeddings\n",
+        "!wget http://nlp.stanford.edu/data/glove.840B.300d.zip"
+      ],
+      "execution_count": 28,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "text": [
+            "--2019-06-16 01:12:17--  http://nlp.stanford.edu/data/glove.840B.300d.zip\n",
+            "Resolving nlp.stanford.edu (nlp.stanford.edu)... 171.64.67.140\n",
+            "Connecting to nlp.stanford.edu (nlp.stanford.edu)|171.64.67.140|:80... connected.\n",
+            "HTTP request sent, awaiting response... 302 Found\n",
+            "Location: https://nlp.stanford.edu/data/glove.840B.300d.zip [following]\n",
+            "--2019-06-16 01:12:17--  https://nlp.stanford.edu/data/glove.840B.300d.zip\n",
+            "Connecting to nlp.stanford.edu (nlp.stanford.edu)|171.64.67.140|:443... connected.\n",
+            "HTTP request sent, awaiting response... 301 Moved Permanently\n",
+            "Location: http://downloads.cs.stanford.edu/nlp/data/glove.840B.300d.zip [following]\n",
+            "--2019-06-16 01:12:18--  http://downloads.cs.stanford.edu/nlp/data/glove.840B.300d.zip\n",
+            "Resolving downloads.cs.stanford.edu (downloads.cs.stanford.edu)... 171.64.64.22\n",
+            "Connecting to downloads.cs.stanford.edu (downloads.cs.stanford.edu)|171.64.64.22|:80... connected.\n",
+            "HTTP request sent, awaiting response... 200 OK\n",
+            "Length: 2176768927 (2.0G) [application/zip]\n",
+            "Saving to: ‘glove.840B.300d.zip’\n",
+            "\n",
+            "glove.840B.300d.zip 100%[===================>]   2.03G  18.8MB/s    in 1m 52s  \n",
+            "\n",
+            "2019-06-16 01:14:10 (18.5 MB/s) - ‘glove.840B.300d.zip’ saved [2176768927/2176768927]\n",
+            "\n"
+          ],
+          "name": "stdout"
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "usjjgpek2n7g",
+        "colab_type": "code",
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 34
+        },
+        "outputId": "530c03e8-2886-4859-c07c-338598cf7936"
+      },
+      "source": [
+        "!ls"
+      ],
+      "execution_count": 29,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "text": [
+            "glove.840B.300d.zip  RePORTER_PRJ_C_FY2017.zip\tsample_data\n"
+          ],
+          "name": "stdout"
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "kDz-zw0_2CnL",
+        "colab_type": "text"
+      },
+      "source": [
+        "#### Prepare Glove Embedding Matrix"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "sR3EWfO18c-J",
+        "colab_type": "code",
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 69
+        },
+        "outputId": "12471428-bec1-4636-b1ac-f5a5013b0499"
+      },
+      "source": [
+        "# Glove Word Embeddings\n",
+        "GLOVE_DIR = 'glove.840B.300d.txt'\n",
+        "EMBEDDING_SIZE = 300\n",
+        "GLOVE_FILE_NAME = \"glove.840B.300d.zip\"\n",
+        "\n",
+        "  \n",
+        "# opening the zip file in READ mode \n",
+        "with ZipFile(GLOVE_FILE_NAME, 'r') as z:\n",
+        "  \n",
+        "    # print all the contents of the zip file \n",
+        "    z.printdir() \n",
+        "  \n",
+        "    # extracting all the files \n",
+        "    z.extractall() \n",
+        "    \n",
+        "\n",
+        "# Store all embeddings {'token': n-dimensional embedding_series}\n",
+        "embeddings_index = {}\n",
+        "\n",
+        "with open(GLOVE_DIR, 'rb') as f:\n",
+        "    for line in f:\n",
+        "        values = line.split()\n",
+        "        word = values[0].decode('utf-8')\n",
+        "        embedding = np.asarray(values[1:], dtype='float32')\n",
+        "        embeddings_index[word] = embedding\n",
+        "\n",
+        "print(f'Found {len(embeddings_index)} word vectors.')\n",
+        "\n",
+        "# create a weight matrix for words in training docs\n",
+        "embedding_matrix = zeros((vocab_size, EMBEDDING_SIZE))\n",
+        "\n",
+        "for word, i in tokenizer.word_index.items():    \n",
+        "    embedding_vector = embeddings_index.get(word)\n",
+        "    \n",
+        "    # add each word in the embedding_matrix in the slot for the tokenizer's word id\n",
+        "    if embedding_vector is not None:\n",
+        "        embedding_matrix[i] = embedding_vector"
+      ],
+      "execution_count": 30,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "text": [
+            "File Name                                             Modified             Size\n",
+            "glove.840B.300d.txt                            2015-10-24 10:35:30   5646236541\n",
+            "Found 2196016 word vectors.\n"
+          ],
+          "name": "stdout"
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "-ir8wISq7PqG",
+        "colab_type": "code",
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 34
+        },
+        "outputId": "0481098d-990c-4946-9e52-57cef0dca8a2"
+      },
+      "source": [
+        "!rm -rf glove.840B.300d.zip\n",
+        "!ls"
+      ],
+      "execution_count": 38,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "text": [
+            "BioASQword2vec\tglove.840B.300d.txt  RePORTER_PRJ_C_FY2017.zip\tsample_data\n"
+          ],
+          "name": "stdout"
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "8bKCZgkK4JSz",
+        "colab_type": "text"
+      },
+      "source": [
+        "## Test Embedding Model with Glove Embeddings"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "8LCMz3AB8c_m",
+        "colab_type": "code",
+        "outputId": "e990472a-e559-4cdd-9b52-028fd340b909",
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 103
+        }
+      },
+      "source": [
+        "# instantiate nlp model pipeline\n",
+        "embedding_model = EmbeddingModel(\n",
+        "    X_train=X_train, \n",
+        "    X_test=X_test, \n",
+        "    y_train=y_train, \n",
+        "    y_test=y_test,\n",
+        "    max_num_words=10000,\n",
+        "    max_seq_length=75,\n",
+        "    embedding_dir=GLOVE_DIR,\n",
+        "    embedding_size=EMBEDDING_SIZE\n",
+        ")\n",
+        "\n",
+        "# set-up and train model\n",
+        "embedding_model.setup_model_pipeline()"
+      ],
+      "execution_count": 54,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "text": [
+            "completed tokenizing and padding text - train: True\n",
+            "completed tokenizing and padding text - train: False\n",
+            "completed creating embedding index\n",
+            "completed creating embedding matrix\n",
+            "model pipeline set-up complete\n"
+          ],
+          "name": "stdout"
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "q8i4wqQo8pDZ",
+        "colab_type": "code",
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 396
+        },
+        "outputId": "32eda634-6d2c-40de-ab87-9b62a99035ec"
+      },
+      "source": [
+        "embedding_model.fit(epochs=10)"
+      ],
+      "execution_count": 55,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "text": [
+            "Train on 46022 samples, validate on 15341 samples\n",
+            "Epoch 1/10\n",
+            "46022/46022 [==============================] - 5s 110us/step - loss: 1.5091 - acc: 0.5406 - val_loss: 1.3428 - val_acc: 0.5921\n",
+            "Epoch 2/10\n",
+            "46022/46022 [==============================] - 5s 106us/step - loss: 1.1790 - acc: 0.6405 - val_loss: 1.3342 - val_acc: 0.5994\n",
+            "Epoch 3/10\n",
+            "46022/46022 [==============================] - 5s 99us/step - loss: 1.0786 - acc: 0.6696 - val_loss: 1.3286 - val_acc: 0.6034\n",
+            "Epoch 4/10\n",
+            "46022/46022 [==============================] - 5s 98us/step - loss: 1.0144 - acc: 0.6873 - val_loss: 1.3488 - val_acc: 0.6022\n",
+            "Epoch 5/10\n",
+            "46022/46022 [==============================] - 4s 97us/step - loss: 0.9720 - acc: 0.7018 - val_loss: 1.3535 - val_acc: 0.6048\n",
+            "Epoch 6/10\n",
+            "46022/46022 [==============================] - 5s 98us/step - loss: 0.9375 - acc: 0.7132 - val_loss: 1.3852 - val_acc: 0.5980\n",
+            "Epoch 7/10\n",
+            "46022/46022 [==============================] - 4s 97us/step - loss: 0.9114 - acc: 0.7204 - val_loss: 1.4045 - val_acc: 0.6023\n",
+            "Epoch 8/10\n",
+            "46022/46022 [==============================] - 5s 101us/step - loss: 0.8893 - acc: 0.7266 - val_loss: 1.4223 - val_acc: 0.6000\n",
+            "Epoch 9/10\n",
+            "46022/46022 [==============================] - 5s 101us/step - loss: 0.8702 - acc: 0.7333 - val_loss: 1.4502 - val_acc: 0.5983\n",
+            "Epoch 10/10\n",
+            "46022/46022 [==============================] - 5s 98us/step - loss: 0.8540 - acc: 0.7383 - val_loss: 1.4708 - val_acc: 0.5964\n",
+            "completed training model\n"
+          ],
+          "name": "stdout"
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "xZsPY2hB8c_m",
+        "colab_type": "text"
+      },
+      "source": [
+        "# Use content specific Embeddings"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "o88f7ods8c_n",
+        "colab_type": "text"
+      },
+      "source": [
+        "##### bioasq\n",
+        "\n",
+        "\"We applied word2vec to a corpus of 10,876,004 English abstracts of biomedical articles from PubMed. The resulting vectors of 1,701,632 distinct words (types) are now publicly available from http://bioasq.lip6.fr/tools/BioASQword2vec/. File size: 1.3GB (compressed), 3.5GB (uncompressed).\"\n",
+        "\n",
+        "SOURCE: http://bioasq.org/news/bioasq-releases-continuous-space-word-vectors-obtained-applying-word2vec-pubmed-abstracts"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "PH6CWvBCPMiS",
+        "colab_type": "code",
+        "outputId": "8db91e46-1bcc-4608-947e-1687af5f9c28",
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 189
+        }
+      },
+      "source": [
+        "%%time\n",
+        "\n",
+        "!wget http://bioasq.lip6.fr/tools/BioASQword2vec  # download bio word embeddings\n",
+        "!mv BioASQword2vec BioASQword2vec.tar.gz          # update the downloaded file to the correct .tag.gz name\n",
+        "!tar -xvzf BioASQword2vec.tar.gz                  # unzip the file\n",
+        "!ls"
+      ],
+      "execution_count": 50,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "text": [
+            "word2vecTools/toolkit.py\n",
+            "word2vecTools/vectors.txt\n",
+            "word2vecTools/\n",
+            "word2vecTools/README_BioASQ_word_vectors.pdf\n",
+            "word2vecTools/types.txt\n",
+            "word2vecTools/train_vectors.sh\n",
+            "BioASQword2vec.tar.gz  RePORTER_PRJ_C_FY2017.zip  word2vecTools\n",
+            "glove.840B.300d.txt    sample_data\n",
+            "CPU times: user 296 ms, sys: 365 ms, total: 662 ms\n",
+            "Wall time: 49.4 s\n"
+          ],
+          "name": "stdout"
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "MjKwGD_Z8c_n",
+        "colab_type": "code",
+        "colab": {}
+      },
+      "source": [
+        "class BioasqEmbeddingModel(EmbeddingModel):\n",
+        "\n",
+        "    # override the EmbeddingModel's create_embeddings_index to read in bioasq embeddings\n",
+        "    def create_embeddings_index(self):\n",
+        "\n",
+        "        # read in a file with all the learned tokens\n",
+        "        with open(r'word2vecTools/types.txt', 'r') as f:\n",
+        "            tokens = [line.strip() for line in f]\n",
+        "\n",
+        "        # read in a file with the associated embeddings for the tokens\n",
+        "        with open('word2vecTools/vectors.txt', 'rb') as f:\n",
+        "            embeddings = [np.asarray(embedding.split(), dtype='float32') for embedding in f]\n",
+        "\n",
+        "        # create a dict of the word --> embedding mappings\n",
+        "        embeddings_index = {word:embedding for word, embedding in zip(tokens, embeddings)}\n",
+        "\n",
+        "        print('completed creating pubmed embedding index')\n",
+        "        self.embeddings_index = embeddings_index"
+      ],
+      "execution_count": 0,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "scrolled": false,
+        "id": "vFYOkpvP8c_n",
+        "colab_type": "code",
+        "outputId": "57d31157-3125-4208-be48-4ee1917db650",
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 138
+        }
+      },
+      "source": [
+        "%%time\n",
+        "\n",
+        "# set-up model pipeline\n",
+        "bioasq_model = BioasqEmbeddingModel(\n",
+        "    X_train=X_train, \n",
+        "    X_test=X_test, \n",
+        "    y_train=y_train,\n",
+        "    y_test=y_test,\n",
+        "    max_num_words=20000,\n",
+        "    max_seq_length=75,\n",
+        "    embedding_size=200\n",
+        ")\n",
+        "bioasq_model.setup_model_pipeline()"
+      ],
+      "execution_count": 52,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "text": [
+            "completed tokenizing and padding text - train: True\n",
+            "completed tokenizing and padding text - train: False\n",
+            "completed creating pubmed embedding index\n",
+            "completed creating embedding matrix\n",
+            "model pipeline set-up complete\n",
+            "CPU times: user 59.9 s, sys: 3.33 s, total: 1min 3s\n",
+            "Wall time: 1min 3s\n"
+          ],
+          "name": "stdout"
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "LMlcKC9p8c_o",
+        "colab_type": "code",
+        "outputId": "9b71e92d-a5c9-4541-e27b-c87f4ca7a692",
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 448
+        }
+      },
+      "source": [
+        "%%time\n",
+        "\n",
+        "# default model if a custom model is not provided\n",
+        "model = Sequential()\n",
+        "model.add(bioasq_model.get_embedding_layer())\n",
+        "model.add(Flatten())\n",
+        "model.add(Dense(bioasq_model.num_classes, activation='softmax'))\n",
+        "model.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])\n",
+        "\n",
+        "# train model\n",
+        "bioasq_model.fit(epochs=10, model=model)"
+      ],
+      "execution_count": 53,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "text": [
+            "using custom model\n",
+            "Train on 46022 samples, validate on 15341 samples\n",
+            "Epoch 1/10\n",
+            "46022/46022 [==============================] - 5s 107us/step - loss: 1.5695 - acc: 0.5344 - val_loss: 1.3527 - val_acc: 0.5939\n",
+            "Epoch 2/10\n",
+            "46022/46022 [==============================] - 5s 99us/step - loss: 1.2153 - acc: 0.6345 - val_loss: 1.2754 - val_acc: 0.6135\n",
+            "Epoch 3/10\n",
+            "46022/46022 [==============================] - 4s 97us/step - loss: 1.1162 - acc: 0.6635 - val_loss: 1.2548 - val_acc: 0.6174\n",
+            "Epoch 4/10\n",
+            "46022/46022 [==============================] - 4s 97us/step - loss: 1.0591 - acc: 0.6779 - val_loss: 1.2489 - val_acc: 0.6186\n",
+            "Epoch 5/10\n",
+            "46022/46022 [==============================] - 4s 97us/step - loss: 1.0199 - acc: 0.6893 - val_loss: 1.2498 - val_acc: 0.6182\n",
+            "Epoch 6/10\n",
+            "46022/46022 [==============================] - 4s 97us/step - loss: 0.9903 - acc: 0.6976 - val_loss: 1.2551 - val_acc: 0.6200\n",
+            "Epoch 7/10\n",
+            "46022/46022 [==============================] - 5s 98us/step - loss: 0.9672 - acc: 0.7054 - val_loss: 1.2635 - val_acc: 0.6163\n",
+            "Epoch 8/10\n",
+            "46022/46022 [==============================] - 5s 98us/step - loss: 0.9480 - acc: 0.7107 - val_loss: 1.2720 - val_acc: 0.6163\n",
+            "Epoch 9/10\n",
+            "46022/46022 [==============================] - 5s 99us/step - loss: 0.9320 - acc: 0.7148 - val_loss: 1.2773 - val_acc: 0.6183\n",
+            "Epoch 10/10\n",
+            "46022/46022 [==============================] - 5s 99us/step - loss: 0.9185 - acc: 0.7198 - val_loss: 1.2841 - val_acc: 0.6180\n",
+            "completed training model\n",
+            "CPU times: user 59.2 s, sys: 5.79 s, total: 1min 4s\n",
+            "Wall time: 45.8 s\n"
+          ],
+          "name": "stdout"
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "16dibFeM8c_p",
+        "colab_type": "text"
+      },
+      "source": [
+        "##### Biomedical natural language processing (Pubmed, PMC, and Wikipedia combined embeddings)\n",
+        "\n",
+        "NOTE: This embedding file is 4GB\n",
+        "\n",
+        "\"The openly available biomedical literature contains over 5 billion words in publication abstracts and full texts. Recent advances in unsupervised language processing methods have made it possible to make use of such large unannotated corpora for building statistical language models and inducing high quality vector space representations, which are, in turn, of utility in many tasks such as text classification, named entity recognition and query expansion. In this study, we introduce the first set of such language resources created from analysis of the entire available biomedical literature, including a dataset of all 1- to 5-grams and their probabilities in these texts and new models of word semantics. We discuss the opportunities created by these resources and demonstrate their application. All resources introduced in this study are available under open licenses at http://bio.nlplab.org.\"\n",
+        "\n",
+        "SOURCE: http://bio.nlplab.org/#word-vector-tools\n",
+        "PUBLICATION: http://bio.nlplab.org/pdf/pyysalo13literature.pdf"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "BL1dRgYyi27r",
+        "colab_type": "code",
+        "outputId": "9e960710-72b6-471c-bf82-b4df4eeeed8f",
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 123
+        }
+      },
+      "source": [
+        "from google.colab import drive\n",
+        "drive.mount('/content/gdrive')"
+      ],
+      "execution_count": 56,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "text": [
+            "Go to this URL in a browser: https://accounts.google.com/o/oauth2/auth?client_id=947318989803-6bn6qk8qdgf4n4g3pfee6491hc0brc4i.apps.googleusercontent.com&redirect_uri=urn%3Aietf%3Awg%3Aoauth%3A2.0%3Aoob&scope=email%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fdocs.test%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fdrive%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fdrive.photos.readonly%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fpeopleapi.readonly&response_type=code\n",
+            "\n",
+            "Enter your authorization code:\n",
+            "··········\n",
+            "Mounted at /content/gdrive\n"
+          ],
+          "name": "stdout"
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "BMyVANsMXRdg",
+        "colab_type": "code",
+        "outputId": "60c2b04c-2cf2-4b06-bf5e-c80f1346ea69",
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 206
+        }
+      },
+      "source": [
+        "!wget http://evexdb.org/pmresources/vec-space-models/wikipedia-pubmed-and-PMC-w2v.bin  # download embeddings\n",
+        "!cp wikipedia-pubmed-and-PMC-w2v.bin gdrive/My\\ Drive                                  # move embeddings to personal Google Drive (to avoid large repeated download)"
+      ],
+      "execution_count": 0,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "text": [
+            "--2019-06-14 15:05:14--  http://evexdb.org/pmresources/vec-space-models/wikipedia-pubmed-and-PMC-w2v.bin\n",
+            "Resolving evexdb.org (evexdb.org)... 130.232.253.44\n",
+            "Connecting to evexdb.org (evexdb.org)|130.232.253.44|:80... connected.\n",
+            "HTTP request sent, awaiting response... 200 OK\n",
+            "Length: 4416560851 (4.1G) [application/octet-stream]\n",
+            "Saving to: ‘wikipedia-pubmed-and-PMC-w2v.bin’\n",
+            "\n",
+            "wikipedia-pubmed-an 100%[===================>]   4.11G  1015KB/s    in 70m 35s \n",
+            "\n",
+            "2019-06-14 16:15:50 (1018 KB/s) - ‘wikipedia-pubmed-and-PMC-w2v.bin’ saved [4416560851/4416560851]\n",
+            "\n"
+          ],
+          "name": "stdout"
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "cGaiIpmC8c_p",
+        "colab_type": "code",
+        "colab": {}
+      },
+      "source": [
+        "class PubmedEmbeddingModel(EmbeddingModel):\n",
+        "\n",
+        "    # override the EmbeddingModel's create_embeddings_index to read in pubmed embeddings\n",
+        "    def create_embeddings_index(self):\n",
+        "\n",
+        "        embedding_path = r'wikipedia-pubmed-and-PMC-w2v.bin'\n",
+        "        word_vectors = KeyedVectors.load_word2vec_format(embedding_path, binary=True)\n",
+        "\n",
+        "        # create a dict of the word --> embedding mappings\n",
+        "        embeddings_index = {word: word_vectors.get_vector(word) for word in word_vectors.index2word}\n",
+        "\n",
+        "        print('completed creating pubmed embedding index')\n",
+        "        self.embeddings_index = embeddings_index"
+      ],
+      "execution_count": 0,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "bsxOmrfo8c_q",
+        "colab_type": "code",
+        "outputId": "ee5731c3-efdf-45fd-c1fc-1c6bcc932a7c",
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 192
+        }
+      },
+      "source": [
+        "%%time\n",
+        "\n",
+        "# set-up model pipeline\n",
+        "pubmed_model = PubmedEmbeddingModel(\n",
+        "    X_train=X_train, \n",
+        "    X_test=X_test, \n",
+        "    y_train=y_train,\n",
+        "    y_test=y_test,\n",
+        "    max_num_words=25000,\n",
+        "    max_seq_length=75,\n",
+        "    embedding_size=200\n",
+        ")\n",
+        "pubmed_model.setup_model_pipeline()"
+      ],
+      "execution_count": 0,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "text": [
+            "completed tokenizing and padding text - train: True\n",
+            "completed tokenizing and padding text - train: False\n"
+          ],
+          "name": "stdout"
+        },
+        {
+          "output_type": "stream",
+          "text": [
+            "/usr/local/lib/python3.6/dist-packages/smart_open/smart_open_lib.py:398: UserWarning: This function is deprecated, use smart_open.open instead. See the migration notes for details: https://github.com/RaRe-Technologies/smart_open/blob/master/README.rst#migrating-to-the-new-open-function\n",
+            "  'See the migration notes for details: %s' % _MIGRATION_NOTES_URL\n"
+          ],
+          "name": "stderr"
+        },
+        {
+          "output_type": "stream",
+          "text": [
+            "completed creating pubmed embedding index\n",
+            "completed creating embedding matrix\n",
+            "model pipeline set-up complete\n",
+            "CPU times: user 1min 12s, sys: 6.74 s, total: 1min 19s\n",
+            "Wall time: 1min 19s\n"
+          ],
+          "name": "stdout"
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "tk4OoVc-8c_r",
+        "colab_type": "code",
+        "outputId": "ba0a12a7-8787-4e35-d18a-c7baec7325ba",
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 603
+        }
+      },
+      "source": [
+        "%%time\n",
+        "\n",
+        "pubmed_model.fit(epochs=15)"
+      ],
+      "execution_count": 0,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "text": [
+            "Train on 46022 samples, validate on 15341 samples\n",
+            "Epoch 1/15\n",
+            "46022/46022 [==============================] - 5s 98us/step - loss: 1.6027 - acc: 0.5194 - val_loss: 1.4014 - val_acc: 0.5772\n",
+            "Epoch 2/15\n",
+            "46022/46022 [==============================] - 4s 94us/step - loss: 1.2672 - acc: 0.6172 - val_loss: 1.3255 - val_acc: 0.5947\n",
+            "Epoch 3/15\n",
+            "46022/46022 [==============================] - 4s 93us/step - loss: 1.1715 - acc: 0.6459 - val_loss: 1.3004 - val_acc: 0.6032\n",
+            "Epoch 4/15\n",
+            "46022/46022 [==============================] - 4s 93us/step - loss: 1.1155 - acc: 0.6591 - val_loss: 1.2983 - val_acc: 0.6058\n",
+            "Epoch 5/15\n",
+            "46022/46022 [==============================] - 4s 92us/step - loss: 1.0767 - acc: 0.6710 - val_loss: 1.3002 - val_acc: 0.6038\n",
+            "Epoch 6/15\n",
+            "46022/46022 [==============================] - 4s 93us/step - loss: 1.0475 - acc: 0.6805 - val_loss: 1.3008 - val_acc: 0.6039\n",
+            "Epoch 7/15\n",
+            "46022/46022 [==============================] - 4s 92us/step - loss: 1.0236 - acc: 0.6869 - val_loss: 1.3087 - val_acc: 0.6035\n",
+            "Epoch 8/15\n",
+            "46022/46022 [==============================] - 4s 93us/step - loss: 1.0050 - acc: 0.6922 - val_loss: 1.3136 - val_acc: 0.6026\n",
+            "Epoch 9/15\n",
+            "46022/46022 [==============================] - 4s 92us/step - loss: 0.9889 - acc: 0.6981 - val_loss: 1.3198 - val_acc: 0.6020\n",
+            "Epoch 10/15\n",
+            "46022/46022 [==============================] - 4s 92us/step - loss: 0.9746 - acc: 0.7013 - val_loss: 1.3288 - val_acc: 0.6013\n",
+            "Epoch 11/15\n",
+            "46022/46022 [==============================] - 4s 92us/step - loss: 0.9629 - acc: 0.7061 - val_loss: 1.3359 - val_acc: 0.6000\n",
+            "Epoch 12/15\n",
+            "46022/46022 [==============================] - 4s 91us/step - loss: 0.9528 - acc: 0.7084 - val_loss: 1.3422 - val_acc: 0.6008\n",
+            "Epoch 13/15\n",
+            "46022/46022 [==============================] - 4s 92us/step - loss: 0.9428 - acc: 0.7110 - val_loss: 1.3483 - val_acc: 0.5998\n",
+            "Epoch 14/15\n",
+            "46022/46022 [==============================] - 4s 92us/step - loss: 0.9338 - acc: 0.7139 - val_loss: 1.3593 - val_acc: 0.5972\n",
+            "Epoch 15/15\n",
+            "46022/46022 [==============================] - 4s 92us/step - loss: 0.9260 - acc: 0.7167 - val_loss: 1.3634 - val_acc: 0.5997\n",
+            "completed training model\n",
+            "CPU times: user 1min 22s, sys: 7.99 s, total: 1min 30s\n",
+            "Wall time: 1min 4s\n"
+          ],
+          "name": "stdout"
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "C6nms74C8c_s",
+        "colab_type": "text"
+      },
+      "source": [
+        "# 4. build a deep learning model (e.g. convolutional neural network), ending in a softmax output."
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "YFWUSHHi8c_s",
+        "colab_type": "text"
+      },
+      "source": [
+        "### Convolutional Neural Networ (CNN)"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "EIif2dp08c_t",
+        "colab_type": "code",
+        "colab": {}
+      },
+      "source": [
+        "# define model\n",
+        "\n",
+        "def build_cnn_model(model):\n",
+        "    cnn_model = Sequential()\n",
+        "    cnn_model.add(model.get_embedding_layer())\n",
+        "\n",
+        "    cnn_model.add(Conv1D(512, 1, activation='relu'))\n",
+        "    cnn_model.add(MaxPooling1D(4))\n",
+        "    cnn_model.add(Dropout(.5))\n",
+        "\n",
+        "    cnn_model.add(Conv1D(256, 1, activation='relu'))\n",
+        "    cnn_model.add(MaxPooling1D(1))\n",
+        "    cnn_model.add(Dropout(.4))\n",
+        "\n",
+        "    cnn_model.add(Conv1D(128, 1, activation='relu'))\n",
+        "    cnn_model.add(MaxPooling1D(1))\n",
+        "    cnn_model.add(Dropout(.3))\n",
+        "\n",
+        "    cnn_model.add(Conv1D(64, 1, activation='relu'))\n",
+        "    cnn_model.add(MaxPooling1D(1))\n",
+        "    cnn_model.add(Dropout(.2))\n",
+        "\n",
+        "    \n",
+        "    cnn_model.add(GlobalAveragePooling1D())\n",
+        "\n",
+        "    cnn_model.add(Dense(units=64, activation='relu'))\n",
+        "    cnn_model.add(Dense(units=64, activation='relu'))\n",
+        "\n",
+        "    cnn_model.add(Dense(model.num_classes, activation='softmax'))\n",
+        "    cnn_model.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])\n",
+        "    \n",
+        "    return cnn_model"
+      ],
+      "execution_count": 0,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "AcCnpDMM8c_u",
+        "colab_type": "code",
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 691
+        },
+        "outputId": "18ec4fb6-3f42-43cf-a84c-2e151d4aae86"
+      },
+      "source": [
+        "# set-up and train model\n",
+        "cnn_model = build_cnn_model(embedding_model)\n",
+        "embedding_model.fit(epochs=15, model=cnn_model)"
+      ],
+      "execution_count": 62,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "text": [
+            "W0616 01:49:31.710656 140041243158400 deprecation_wrapper.py:119] From /usr/local/lib/python3.6/dist-packages/keras/backend/tensorflow_backend.py:3976: The name tf.nn.max_pool is deprecated. Please use tf.nn.max_pool2d instead.\n",
+            "\n",
+            "W0616 01:49:31.735905 140041243158400 deprecation.py:506] From /usr/local/lib/python3.6/dist-packages/keras/backend/tensorflow_backend.py:3445: calling dropout (from tensorflow.python.ops.nn_ops) with keep_prob is deprecated and will be removed in a future version.\n",
+            "Instructions for updating:\n",
+            "Please use `rate` instead of `keep_prob`. Rate should be set to `rate = 1 - keep_prob`.\n"
+          ],
+          "name": "stderr"
+        },
+        {
+          "output_type": "stream",
+          "text": [
+            "using custom model\n",
+            "Train on 46022 samples, validate on 15341 samples\n",
+            "Epoch 1/15\n",
+            "46022/46022 [==============================] - 16s 345us/step - loss: 1.7348 - acc: 0.4455 - val_loss: 1.4085 - val_acc: 0.5762\n",
+            "Epoch 2/15\n",
+            "46022/46022 [==============================] - 11s 247us/step - loss: 1.3300 - acc: 0.6077 - val_loss: 1.2198 - val_acc: 0.6465\n",
+            "Epoch 3/15\n",
+            "46022/46022 [==============================] - 11s 243us/step - loss: 1.2149 - acc: 0.6469 - val_loss: 1.1540 - val_acc: 0.6673\n",
+            "Epoch 4/15\n",
+            "46022/46022 [==============================] - 11s 247us/step - loss: 1.1645 - acc: 0.6616 - val_loss: 1.1183 - val_acc: 0.6703\n",
+            "Epoch 5/15\n",
+            "46022/46022 [==============================] - 11s 242us/step - loss: 1.1308 - acc: 0.6730 - val_loss: 1.1376 - val_acc: 0.6692\n",
+            "Epoch 6/15\n",
+            "46022/46022 [==============================] - 11s 241us/step - loss: 1.1054 - acc: 0.6783 - val_loss: 1.1268 - val_acc: 0.6700\n",
+            "Epoch 7/15\n",
+            "46022/46022 [==============================] - 11s 243us/step - loss: 1.0933 - acc: 0.6825 - val_loss: 1.1035 - val_acc: 0.6786\n",
+            "Epoch 8/15\n",
+            "46022/46022 [==============================] - 11s 242us/step - loss: 1.0854 - acc: 0.6855 - val_loss: 1.0942 - val_acc: 0.6825\n",
+            "Epoch 9/15\n",
+            "46022/46022 [==============================] - 11s 243us/step - loss: 1.0764 - acc: 0.6884 - val_loss: 1.0894 - val_acc: 0.6847\n",
+            "Epoch 10/15\n",
+            "46022/46022 [==============================] - 11s 246us/step - loss: 1.0779 - acc: 0.6893 - val_loss: 1.1037 - val_acc: 0.6864\n",
+            "Epoch 11/15\n",
+            "46022/46022 [==============================] - 11s 249us/step - loss: 1.0683 - acc: 0.6922 - val_loss: 1.1209 - val_acc: 0.6771\n",
+            "Epoch 12/15\n",
+            "46022/46022 [==============================] - 11s 246us/step - loss: 1.0751 - acc: 0.6922 - val_loss: 1.0956 - val_acc: 0.6885\n",
+            "Epoch 13/15\n",
+            "46022/46022 [==============================] - 11s 248us/step - loss: 1.0736 - acc: 0.6941 - val_loss: 1.0951 - val_acc: 0.6888\n",
+            "Epoch 14/15\n",
+            "46022/46022 [==============================] - 11s 243us/step - loss: 1.0810 - acc: 0.6935 - val_loss: 1.1260 - val_acc: 0.6807\n",
+            "Epoch 15/15\n",
+            "46022/46022 [==============================] - 11s 249us/step - loss: 1.0999 - acc: 0.6930 - val_loss: 1.1482 - val_acc: 0.6842\n",
+            "completed training model\n"
+          ],
+          "name": "stdout"
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "JiIR2VLr8c_x",
+        "colab_type": "code",
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 585
+        },
+        "outputId": "7394a1bc-82d2-4dd8-c1f5-8c9a0399eaf6"
+      },
+      "source": [
+        "cnn_model = build_cnn_model(bioasq_model)\n",
+        "bioasq_model.fit(epochs=15, model=cnn_model)"
+      ],
+      "execution_count": 63,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "text": [
+            "using custom model\n",
+            "Train on 46022 samples, validate on 15341 samples\n",
+            "Epoch 1/15\n",
+            "46022/46022 [==============================] - 12s 270us/step - loss: 1.6736 - acc: 0.4629 - val_loss: 1.3288 - val_acc: 0.6063\n",
+            "Epoch 2/15\n",
+            "46022/46022 [==============================] - 11s 248us/step - loss: 1.2701 - acc: 0.6237 - val_loss: 1.1940 - val_acc: 0.6563\n",
+            "Epoch 3/15\n",
+            "46022/46022 [==============================] - 12s 251us/step - loss: 1.1728 - acc: 0.6570 - val_loss: 1.1366 - val_acc: 0.6739\n",
+            "Epoch 4/15\n",
+            "46022/46022 [==============================] - 11s 250us/step - loss: 1.1253 - acc: 0.6708 - val_loss: 1.1006 - val_acc: 0.6771\n",
+            "Epoch 5/15\n",
+            "46022/46022 [==============================] - 11s 248us/step - loss: 1.0956 - acc: 0.6791 - val_loss: 1.0827 - val_acc: 0.6805\n",
+            "Epoch 6/15\n",
+            "46022/46022 [==============================] - 11s 246us/step - loss: 1.0687 - acc: 0.6854 - val_loss: 1.0778 - val_acc: 0.6842\n",
+            "Epoch 7/15\n",
+            "46022/46022 [==============================] - 11s 247us/step - loss: 1.0527 - acc: 0.6905 - val_loss: 1.0575 - val_acc: 0.6887\n",
+            "Epoch 8/15\n",
+            "46022/46022 [==============================] - 11s 241us/step - loss: 1.0435 - acc: 0.6945 - val_loss: 1.0615 - val_acc: 0.6906\n",
+            "Epoch 9/15\n",
+            "46022/46022 [==============================] - 11s 243us/step - loss: 1.0375 - acc: 0.6970 - val_loss: 1.0613 - val_acc: 0.6887\n",
+            "Epoch 10/15\n",
+            "46022/46022 [==============================] - 11s 248us/step - loss: 1.0380 - acc: 0.6976 - val_loss: 1.0570 - val_acc: 0.6934\n",
+            "Epoch 11/15\n",
+            "46022/46022 [==============================] - 11s 242us/step - loss: 1.0331 - acc: 0.6992 - val_loss: 1.0516 - val_acc: 0.6932\n",
+            "Epoch 12/15\n",
+            "46022/46022 [==============================] - 11s 240us/step - loss: 1.0308 - acc: 0.7012 - val_loss: 1.0631 - val_acc: 0.6953\n",
+            "Epoch 13/15\n",
+            "46022/46022 [==============================] - 11s 238us/step - loss: 1.0351 - acc: 0.7018 - val_loss: 1.0582 - val_acc: 0.6964\n",
+            "Epoch 14/15\n",
+            "46022/46022 [==============================] - 11s 243us/step - loss: 1.0402 - acc: 0.7015 - val_loss: 1.0729 - val_acc: 0.6936\n",
+            "Epoch 15/15\n",
+            "46022/46022 [==============================] - 11s 239us/step - loss: 1.0413 - acc: 0.7044 - val_loss: 1.0600 - val_acc: 0.6936\n",
+            "completed training model\n"
+          ],
+          "name": "stdout"
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "_UrXQCIi8c_y",
+        "colab_type": "code",
+        "outputId": "b1543233-e0d5-4ba9-b251-48872c385bc8",
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 182
+        }
+      },
+      "source": [
+        "cnn_model = build_cnn_model(pubmed_model)\n",
+        "pubmed_model.fit(epochs=15, model=cnn_model)"
+      ],
+      "execution_count": 0,
+      "outputs": [
+        {
+          "output_type": "error",
+          "ename": "NameError",
+          "evalue": "ignored",
+          "traceback": [
+            "\u001b[0;31m---------------------------------------------------------------------------\u001b[0m",
+            "\u001b[0;31mNameError\u001b[0m                                 Traceback (most recent call last)",
+            "\u001b[0;32m<ipython-input-1-9a8f3524e9dd>\u001b[0m in \u001b[0;36m<module>\u001b[0;34m()\u001b[0m\n\u001b[0;32m----> 1\u001b[0;31m \u001b[0mcnn_model\u001b[0m \u001b[0;34m=\u001b[0m \u001b[0mbuild_cnn_model\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mpubmed_model\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[0m\u001b[1;32m      2\u001b[0m \u001b[0mpubmed_model\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mfit\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mepochs\u001b[0m\u001b[0;34m=\u001b[0m\u001b[0;36m15\u001b[0m\u001b[0;34m,\u001b[0m \u001b[0mmodel\u001b[0m\u001b[0;34m=\u001b[0m\u001b[0mcnn_model\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n",
+            "\u001b[0;31mNameError\u001b[0m: name 'build_cnn_model' is not defined"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "5GR-RmWB8c_z",
+        "colab_type": "text"
+      },
+      "source": [
+        "### LSTM"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "ApLUSaiS8c_z",
+        "colab_type": "code",
+        "colab": {}
+      },
+      "source": [
+        "# define model\n",
+        "def build_lstm(model):\n",
+        "    lstm_model = Sequential()\n",
+        "    lstm_model.add(model.get_embedding_layer())\n",
+        "    lstm_model.add(LSTM(64))\n",
+        "    lstm_model.add(Dense(model.num_classes, activation='softmax'))\n",
+        "    lstm_model.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])\n",
+        "    \n",
+        "    return lstm_model"
+      ],
+      "execution_count": 0,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "CQb3llS08c_0",
+        "colab_type": "code",
+        "outputId": "f6689650-3c68-473d-c71d-f361442eddce",
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 206
+        }
+      },
+      "source": [
+        "# set-up and train model\n",
+        "lstm_model = build_lstm(embedding_model)\n",
+        "embedding_model.fit(epochs=4, model=lstm_model)"
+      ],
+      "execution_count": 0,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "text": [
+            "using custom model\n",
+            "Train on 46022 samples, validate on 15341 samples\n",
+            "Epoch 1/4\n",
+            "46022/46022 [==============================] - 174s 4ms/step - loss: 2.0593 - acc: 0.2899 - val_loss: 1.9241 - val_acc: 0.3843\n",
+            "Epoch 2/4\n",
+            "46022/46022 [==============================] - 171s 4ms/step - loss: 1.8765 - acc: 0.3879 - val_loss: 1.8170 - val_acc: 0.4107\n",
+            "Epoch 3/4\n",
+            "46022/46022 [==============================] - 171s 4ms/step - loss: 1.7767 - acc: 0.4220 - val_loss: 1.9363 - val_acc: 0.3765\n",
+            "Epoch 4/4\n",
+            "46022/46022 [==============================] - 170s 4ms/step - loss: 1.6649 - acc: 0.4620 - val_loss: 1.6117 - val_acc: 0.4775\n",
+            "completed training model\n"
+          ],
+          "name": "stdout"
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "VvE6x2xb8c_1",
+        "colab_type": "code",
+        "outputId": "c4f9e203-a987-491f-82e3-fe41e1ce1746",
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 182
+        }
+      },
+      "source": [
+        "# set-up and train model\n",
+        "lstm_model = build_lstm(bioasq_model)\n",
+        "bioasq_model.fit(epochs=25, model=lstm_model)"
+      ],
+      "execution_count": 0,
+      "outputs": [
+        {
+          "output_type": "error",
+          "ename": "NameError",
+          "evalue": "ignored",
+          "traceback": [
+            "\u001b[0;31m---------------------------------------------------------------------------\u001b[0m",
+            "\u001b[0;31mNameError\u001b[0m                                 Traceback (most recent call last)",
+            "\u001b[0;32m<ipython-input-108-e37f32e3f55a>\u001b[0m in \u001b[0;36m<module>\u001b[0;34m()\u001b[0m\n\u001b[0;32m----> 1\u001b[0;31m \u001b[0mlstm_model\u001b[0m \u001b[0;34m=\u001b[0m \u001b[0mbuild_lstm\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mbioasq_model\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[0m\u001b[1;32m      2\u001b[0m \u001b[0mbioasq_model\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mfit\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mepochs\u001b[0m\u001b[0;34m=\u001b[0m\u001b[0;36m25\u001b[0m\u001b[0;34m,\u001b[0m \u001b[0mmodel\u001b[0m\u001b[0;34m=\u001b[0m\u001b[0mlstm_model\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n",
+            "\u001b[0;31mNameError\u001b[0m: name 'bioasq_model' is not defined"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "X5otksp48c_2",
+        "colab_type": "code",
+        "outputId": "aadf6301-6ff5-4f4c-c0ff-bede0b0e1401",
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 930
+        }
+      },
+      "source": [
+        "lstm_model = build_lstm(pubmed_model)\n",
+        "pubmed_model.fit(epochs=25, model=lstm_model)"
+      ],
+      "execution_count": 0,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "text": [
+            "using custom model\n",
+            "Train on 46022 samples, validate on 15341 samples\n",
+            "Epoch 1/25\n",
+            "46022/46022 [==============================] - 173s 4ms/step - loss: 2.0310 - acc: 0.2950 - val_loss: 1.9802 - val_acc: 0.3540\n",
+            "Epoch 2/25\n",
+            "46022/46022 [==============================] - 172s 4ms/step - loss: 1.8118 - acc: 0.4102 - val_loss: 1.7403 - val_acc: 0.4432\n",
+            "Epoch 3/25\n",
+            "46022/46022 [==============================] - 171s 4ms/step - loss: 1.6604 - acc: 0.4674 - val_loss: 1.5735 - val_acc: 0.4947\n",
+            "Epoch 4/25\n",
+            "46022/46022 [==============================] - 172s 4ms/step - loss: 1.5358 - acc: 0.5038 - val_loss: 1.4728 - val_acc: 0.5247\n",
+            "Epoch 5/25\n",
+            "46022/46022 [==============================] - 171s 4ms/step - loss: 1.3421 - acc: 0.5877 - val_loss: 1.3001 - val_acc: 0.6089\n",
+            "Epoch 6/25\n",
+            "46022/46022 [==============================] - 171s 4ms/step - loss: 1.2130 - acc: 0.6387 - val_loss: 1.2370 - val_acc: 0.6284\n",
+            "Epoch 7/25\n",
+            "46022/46022 [==============================] - 171s 4ms/step - loss: 1.1385 - acc: 0.6598 - val_loss: 1.1751 - val_acc: 0.6485\n",
+            "Epoch 8/25\n",
+            "46022/46022 [==============================] - 172s 4ms/step - loss: 1.0798 - acc: 0.6753 - val_loss: 1.1481 - val_acc: 0.6535\n",
+            "Epoch 9/25\n",
+            "46022/46022 [==============================] - 171s 4ms/step - loss: 1.0315 - acc: 0.6894 - val_loss: 1.1293 - val_acc: 0.6620\n",
+            "Epoch 10/25\n",
+            "46022/46022 [==============================] - 172s 4ms/step - loss: 0.9922 - acc: 0.6992 - val_loss: 1.1405 - val_acc: 0.6623\n",
+            "Epoch 11/25\n",
+            "46022/46022 [==============================] - 172s 4ms/step - loss: 0.9595 - acc: 0.7096 - val_loss: 1.0874 - val_acc: 0.6741\n",
+            "Epoch 12/25\n",
+            "46022/46022 [==============================] - 172s 4ms/step - loss: 0.9268 - acc: 0.7189 - val_loss: 1.0759 - val_acc: 0.6771\n",
+            "Epoch 13/25\n",
+            "46022/46022 [==============================] - 178s 4ms/step - loss: 0.8964 - acc: 0.7277 - val_loss: 1.0938 - val_acc: 0.6765\n",
+            "Epoch 14/25\n",
+            "46022/46022 [==============================] - 173s 4ms/step - loss: 0.8713 - acc: 0.7364 - val_loss: 1.0837 - val_acc: 0.6816\n",
+            "Epoch 15/25\n",
+            "46022/46022 [==============================] - 174s 4ms/step - loss: 0.8471 - acc: 0.7428 - val_loss: 1.1109 - val_acc: 0.6772\n",
+            "Epoch 16/25\n",
+            "46022/46022 [==============================] - 177s 4ms/step - loss: 0.8255 - acc: 0.7497 - val_loss: 1.0866 - val_acc: 0.6852\n",
+            "Epoch 17/25\n",
+            "46022/46022 [==============================] - 179s 4ms/step - loss: 0.8037 - acc: 0.7547 - val_loss: 1.1229 - val_acc: 0.6827\n",
+            "Epoch 18/25\n",
+            "46022/46022 [==============================] - 174s 4ms/step - loss: 0.7796 - acc: 0.7626 - val_loss: 1.0976 - val_acc: 0.6867\n",
+            "Epoch 19/25\n",
+            "46022/46022 [==============================] - 179s 4ms/step - loss: 0.7638 - acc: 0.7681 - val_loss: 1.0976 - val_acc: 0.6867\n",
+            "Epoch 20/25\n",
+            "46022/46022 [==============================] - 179s 4ms/step - loss: 0.7446 - acc: 0.7738 - val_loss: 1.1149 - val_acc: 0.6850\n",
+            "Epoch 21/25\n",
+            "46022/46022 [==============================] - 176s 4ms/step - loss: 0.7264 - acc: 0.7794 - val_loss: 1.1168 - val_acc: 0.6829\n",
+            "Epoch 22/25\n",
+            "46022/46022 [==============================] - 176s 4ms/step - loss: 0.7070 - acc: 0.7849 - val_loss: 1.1317 - val_acc: 0.6859\n",
+            "Epoch 23/25\n",
+            "46022/46022 [==============================] - 176s 4ms/step - loss: 0.6887 - acc: 0.7918 - val_loss: 1.1481 - val_acc: 0.6846\n",
+            "Epoch 24/25\n",
+            "46022/46022 [==============================] - 177s 4ms/step - loss: 0.6728 - acc: 0.7953 - val_loss: 1.1632 - val_acc: 0.6863\n",
+            "Epoch 25/25\n",
+            "46022/46022 [==============================] - 175s 4ms/step - loss: 0.6586 - acc: 0.8003 - val_loss: 1.2146 - val_acc: 0.6752\n",
+            "completed training model\n"
+          ],
+          "name": "stdout"
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "VqCQqx528c_7",
+        "colab_type": "text"
+      },
+      "source": [
+        "# FLAIR \n",
+        "\n",
+        "#### NOTE: Due to Colab 12GB memory constraint, you should probably reset your environment before running the below code or it will likely crash"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "OM1spNNq8c_8",
+        "colab_type": "code",
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 2569
+        },
+        "outputId": "aa8ab454-9358-4bc3-e54a-528f1258874c"
+      },
+      "source": [
+        "!pip3 install https://download.pytorch.org/whl/cpu/torch-1.1.0-cp36-cp36m-linux_x86_64.whl\n",
+        "!pip3 install https://download.pytorch.org/whl/cpu/torchvision-0.3.0-cp36-cp36m-linux_x86_64.whl\n",
+        "!pip install flair\n",
+        "!pip install allennlp"
+      ],
+      "execution_count": 1,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "text": [
+            "Requirement already satisfied: torch==1.1.0 from https://download.pytorch.org/whl/cpu/torch-1.1.0-cp36-cp36m-linux_x86_64.whl in /usr/local/lib/python3.6/dist-packages (1.1.0)\n",
+            "Requirement already satisfied: numpy in /usr/local/lib/python3.6/dist-packages (from torch==1.1.0) (1.16.4)\n",
+            "Requirement already satisfied: torchvision==0.3.0 from https://download.pytorch.org/whl/cpu/torchvision-0.3.0-cp36-cp36m-linux_x86_64.whl in /usr/local/lib/python3.6/dist-packages (0.3.0)\n",
+            "Requirement already satisfied: numpy in /usr/local/lib/python3.6/dist-packages (from torchvision==0.3.0) (1.16.4)\n",
+            "Requirement already satisfied: torch>=1.1.0 in /usr/local/lib/python3.6/dist-packages (from torchvision==0.3.0) (1.1.0)\n",
+            "Requirement already satisfied: six in /usr/local/lib/python3.6/dist-packages (from torchvision==0.3.0) (1.12.0)\n",
+            "Requirement already satisfied: pillow>=4.1.1 in /usr/local/lib/python3.6/dist-packages (from torchvision==0.3.0) (4.3.0)\n",
+            "Requirement already satisfied: olefile in /usr/local/lib/python3.6/dist-packages (from pillow>=4.1.1->torchvision==0.3.0) (0.46)\n",
+            "Requirement already satisfied: flair in /usr/local/lib/python3.6/dist-packages (0.4.2)\n",
+            "Requirement already satisfied: segtok>=1.5.7 in /usr/local/lib/python3.6/dist-packages (from flair) (1.5.7)\n",
+            "Requirement already satisfied: hyperopt>=0.1.1 in /usr/local/lib/python3.6/dist-packages (from flair) (0.1.2)\n",
+            "Requirement already satisfied: tqdm>=4.26.0 in /usr/local/lib/python3.6/dist-packages (from flair) (4.28.1)\n",
+            "Requirement already satisfied: sklearn in /usr/local/lib/python3.6/dist-packages (from flair) (0.0)\n",
+            "Requirement already satisfied: mpld3==0.3 in /usr/local/lib/python3.6/dist-packages (from flair) (0.3)\n",
+            "Requirement already satisfied: pytest>=3.6.4 in /usr/local/lib/python3.6/dist-packages (from flair) (3.6.4)\n",
+            "Requirement already satisfied: tabulate in /usr/local/lib/python3.6/dist-packages (from flair) (0.8.3)\n",
+            "Requirement already satisfied: sqlitedict>=1.6.0 in /usr/local/lib/python3.6/dist-packages (from flair) (1.6.0)\n",
+            "Requirement already satisfied: pytorch-pretrained-bert>=0.6.1 in /usr/local/lib/python3.6/dist-packages (from flair) (0.6.2)\n",
+            "Requirement already satisfied: regex in /usr/local/lib/python3.6/dist-packages (from flair) (2019.6.8)\n",
+            "Requirement already satisfied: urllib3<1.25,>=1.20 in /usr/local/lib/python3.6/dist-packages (from flair) (1.24.3)\n",
+            "Requirement already satisfied: deprecated>=1.2.4 in /usr/local/lib/python3.6/dist-packages (from flair) (1.2.5)\n",
+            "Requirement already satisfied: matplotlib>=2.2.3 in /usr/local/lib/python3.6/dist-packages (from flair) (3.0.3)\n",
+            "Requirement already satisfied: bpemb>=0.2.9 in /usr/local/lib/python3.6/dist-packages (from flair) (0.3.0)\n",
+            "Requirement already satisfied: gensim>=3.4.0 in /usr/local/lib/python3.6/dist-packages (from flair) (3.6.0)\n",
+            "Requirement already satisfied: torch>=1.0.0 in /usr/local/lib/python3.6/dist-packages (from flair) (1.1.0)\n",
+            "Requirement already satisfied: numpy in /usr/local/lib/python3.6/dist-packages (from hyperopt>=0.1.1->flair) (1.16.4)\n",
+            "Requirement already satisfied: six in /usr/local/lib/python3.6/dist-packages (from hyperopt>=0.1.1->flair) (1.12.0)\n",
+            "Requirement already satisfied: networkx in /usr/local/lib/python3.6/dist-packages (from hyperopt>=0.1.1->flair) (2.3)\n",
+            "Requirement already satisfied: future in /usr/local/lib/python3.6/dist-packages (from hyperopt>=0.1.1->flair) (0.16.0)\n",
+            "Requirement already satisfied: scipy in /usr/local/lib/python3.6/dist-packages (from hyperopt>=0.1.1->flair) (1.3.0)\n",
+            "Requirement already satisfied: pymongo in /usr/local/lib/python3.6/dist-packages (from hyperopt>=0.1.1->flair) (3.8.0)\n",
+            "Requirement already satisfied: scikit-learn in /usr/local/lib/python3.6/dist-packages (from sklearn->flair) (0.21.2)\n",
+            "Requirement already satisfied: atomicwrites>=1.0 in /usr/local/lib/python3.6/dist-packages (from pytest>=3.6.4->flair) (1.3.0)\n",
+            "Requirement already satisfied: py>=1.5.0 in /usr/local/lib/python3.6/dist-packages (from pytest>=3.6.4->flair) (1.8.0)\n",
+            "Requirement already satisfied: setuptools in /usr/local/lib/python3.6/dist-packages (from pytest>=3.6.4->flair) (41.0.1)\n",
+            "Requirement already satisfied: pluggy<0.8,>=0.5 in /usr/local/lib/python3.6/dist-packages (from pytest>=3.6.4->flair) (0.7.1)\n",
+            "Requirement already satisfied: attrs>=17.4.0 in /usr/local/lib/python3.6/dist-packages (from pytest>=3.6.4->flair) (19.1.0)\n",
+            "Requirement already satisfied: more-itertools>=4.0.0 in /usr/local/lib/python3.6/dist-packages (from pytest>=3.6.4->flair) (7.0.0)\n",
+            "Requirement already satisfied: boto3 in /usr/local/lib/python3.6/dist-packages (from pytorch-pretrained-bert>=0.6.1->flair) (1.9.165)\n",
+            "Requirement already satisfied: requests in /usr/local/lib/python3.6/dist-packages (from pytorch-pretrained-bert>=0.6.1->flair) (2.21.0)\n",
+            "Requirement already satisfied: wrapt<2,>=1 in /usr/local/lib/python3.6/dist-packages (from deprecated>=1.2.4->flair) (1.11.1)\n",
+            "Requirement already satisfied: cycler>=0.10 in /usr/local/lib/python3.6/dist-packages (from matplotlib>=2.2.3->flair) (0.10.0)\n",
+            "Requirement already satisfied: pyparsing!=2.0.4,!=2.1.2,!=2.1.6,>=2.0.1 in /usr/local/lib/python3.6/dist-packages (from matplotlib>=2.2.3->flair) (2.4.0)\n",
+            "Requirement already satisfied: python-dateutil>=2.1 in /usr/local/lib/python3.6/dist-packages (from matplotlib>=2.2.3->flair) (2.5.3)\n",
+            "Requirement already satisfied: kiwisolver>=1.0.1 in /usr/local/lib/python3.6/dist-packages (from matplotlib>=2.2.3->flair) (1.1.0)\n",
+            "Requirement already satisfied: sentencepiece in /usr/local/lib/python3.6/dist-packages (from bpemb>=0.2.9->flair) (0.1.82)\n",
+            "Requirement already satisfied: smart-open>=1.2.1 in /usr/local/lib/python3.6/dist-packages (from gensim>=3.4.0->flair) (1.8.4)\n",
+            "Requirement already satisfied: decorator>=4.3.0 in /usr/local/lib/python3.6/dist-packages (from networkx->hyperopt>=0.1.1->flair) (4.4.0)\n",
+            "Requirement already satisfied: joblib>=0.11 in /usr/local/lib/python3.6/dist-packages (from scikit-learn->sklearn->flair) (0.13.2)\n",
+            "Requirement already satisfied: botocore<1.13.0,>=1.12.165 in /usr/local/lib/python3.6/dist-packages (from boto3->pytorch-pretrained-bert>=0.6.1->flair) (1.12.165)\n",
+            "Requirement already satisfied: s3transfer<0.3.0,>=0.2.0 in /usr/local/lib/python3.6/dist-packages (from boto3->pytorch-pretrained-bert>=0.6.1->flair) (0.2.1)\n",
+            "Requirement already satisfied: jmespath<1.0.0,>=0.7.1 in /usr/local/lib/python3.6/dist-packages (from boto3->pytorch-pretrained-bert>=0.6.1->flair) (0.9.4)\n",
+            "Requirement already satisfied: chardet<3.1.0,>=3.0.2 in /usr/local/lib/python3.6/dist-packages (from requests->pytorch-pretrained-bert>=0.6.1->flair) (3.0.4)\n",
+            "Requirement already satisfied: certifi>=2017.4.17 in /usr/local/lib/python3.6/dist-packages (from requests->pytorch-pretrained-bert>=0.6.1->flair) (2019.3.9)\n",
+            "Requirement already satisfied: idna<2.9,>=2.5 in /usr/local/lib/python3.6/dist-packages (from requests->pytorch-pretrained-bert>=0.6.1->flair) (2.8)\n",
+            "Requirement already satisfied: boto>=2.32 in /usr/local/lib/python3.6/dist-packages (from smart-open>=1.2.1->gensim>=3.4.0->flair) (2.49.0)\n",
+            "Requirement already satisfied: docutils>=0.10 in /usr/local/lib/python3.6/dist-packages (from botocore<1.13.0,>=1.12.165->boto3->pytorch-pretrained-bert>=0.6.1->flair) (0.14)\n",
+            "Requirement already satisfied: allennlp in /usr/local/lib/python3.6/dist-packages (0.8.4)\n",
+            "Requirement already satisfied: scikit-learn in /usr/local/lib/python3.6/dist-packages (from allennlp) (0.21.2)\n",
+            "Requirement already satisfied: numpy in /usr/local/lib/python3.6/dist-packages (from allennlp) (1.16.4)\n",
+            "Requirement already satisfied: flaky in /usr/local/lib/python3.6/dist-packages (from allennlp) (3.5.3)\n",
+            "Requirement already satisfied: flask-cors>=3.0.7 in /usr/local/lib/python3.6/dist-packages (from allennlp) (3.0.8)\n",
+            "Requirement already satisfied: sqlparse>=0.2.4 in /usr/local/lib/python3.6/dist-packages (from allennlp) (0.3.0)\n",
+            "Requirement already satisfied: h5py in /usr/local/lib/python3.6/dist-packages (from allennlp) (2.8.0)\n",
+            "Requirement already satisfied: spacy<2.2,>=2.0.18 in /usr/local/lib/python3.6/dist-packages (from allennlp) (2.1.4)\n",
+            "Requirement already satisfied: tqdm>=4.19 in /usr/local/lib/python3.6/dist-packages (from allennlp) (4.28.1)\n",
+            "Requirement already satisfied: responses>=0.7 in /usr/local/lib/python3.6/dist-packages (from allennlp) (0.10.6)\n",
+            "Requirement already satisfied: word2number>=1.1 in /usr/local/lib/python3.6/dist-packages (from allennlp) (1.1)\n",
+            "Requirement already satisfied: jsonpickle in /usr/local/lib/python3.6/dist-packages (from allennlp) (1.2)\n",
+            "Requirement already satisfied: unidecode in /usr/local/lib/python3.6/dist-packages (from allennlp) (1.1.0)\n",
+            "Requirement already satisfied: matplotlib>=2.2.3 in /usr/local/lib/python3.6/dist-packages (from allennlp) (3.0.3)\n",
+            "Requirement already satisfied: nltk in /usr/local/lib/python3.6/dist-packages (from allennlp) (3.2.5)\n",
+            "Requirement already satisfied: requests>=2.18 in /usr/local/lib/python3.6/dist-packages (from allennlp) (2.21.0)\n",
+            "Requirement already satisfied: flask>=1.0.2 in /usr/local/lib/python3.6/dist-packages (from allennlp) (1.0.3)\n",
+            "Requirement already satisfied: tensorboardX>=1.2 in /usr/local/lib/python3.6/dist-packages (from allennlp) (1.7)\n",
+            "Requirement already satisfied: pytest in /usr/local/lib/python3.6/dist-packages (from allennlp) (3.6.4)\n",
+            "Requirement already satisfied: pytorch-pretrained-bert>=0.6.0 in /usr/local/lib/python3.6/dist-packages (from allennlp) (0.6.2)\n",
+            "Requirement already satisfied: ftfy in /usr/local/lib/python3.6/dist-packages (from allennlp) (5.5.1)\n",
+            "Requirement already satisfied: scipy in /usr/local/lib/python3.6/dist-packages (from allennlp) (1.3.0)\n",
+            "Requirement already satisfied: jsonnet>=0.10.0; sys_platform != \"win32\" in /usr/local/lib/python3.6/dist-packages (from allennlp) (0.13.0)\n",
+            "Requirement already satisfied: overrides in /usr/local/lib/python3.6/dist-packages (from allennlp) (1.9)\n",
+            "Requirement already satisfied: awscli>=1.11.91 in /usr/local/lib/python3.6/dist-packages (from allennlp) (1.16.179)\n",
+            "Requirement already satisfied: editdistance in /usr/local/lib/python3.6/dist-packages (from allennlp) (0.5.3)\n",
+            "Requirement already satisfied: boto3 in /usr/local/lib/python3.6/dist-packages (from allennlp) (1.9.165)\n",
+            "Requirement already satisfied: gevent>=1.3.6 in /usr/local/lib/python3.6/dist-packages (from allennlp) (1.4.0)\n",
+            "Requirement already satisfied: parsimonious>=0.8.0 in /usr/local/lib/python3.6/dist-packages (from allennlp) (0.8.1)\n",
+            "Requirement already satisfied: conllu==0.11 in /usr/local/lib/python3.6/dist-packages (from allennlp) (0.11)\n",
+            "Requirement already satisfied: numpydoc>=0.8.0 in /usr/local/lib/python3.6/dist-packages (from allennlp) (0.9.1)\n",
+            "Requirement already satisfied: torch>=0.4.1 in /usr/local/lib/python3.6/dist-packages (from allennlp) (1.1.0)\n",
+            "Requirement already satisfied: pytz>=2017.3 in /usr/local/lib/python3.6/dist-packages (from allennlp) (2018.9)\n",
+            "Requirement already satisfied: joblib>=0.11 in /usr/local/lib/python3.6/dist-packages (from scikit-learn->allennlp) (0.13.2)\n",
+            "Requirement already satisfied: Six in /usr/local/lib/python3.6/dist-packages (from flask-cors>=3.0.7->allennlp) (1.12.0)\n",
+            "Requirement already satisfied: murmurhash<1.1.0,>=0.28.0 in /usr/local/lib/python3.6/dist-packages (from spacy<2.2,>=2.0.18->allennlp) (1.0.2)\n",
+            "Requirement already satisfied: preshed<2.1.0,>=2.0.1 in /usr/local/lib/python3.6/dist-packages (from spacy<2.2,>=2.0.18->allennlp) (2.0.1)\n",
+            "Requirement already satisfied: jsonschema<3.1.0,>=2.6.0 in /usr/local/lib/python3.6/dist-packages (from spacy<2.2,>=2.0.18->allennlp) (2.6.0)\n",
+            "Requirement already satisfied: srsly<1.1.0,>=0.0.5 in /usr/local/lib/python3.6/dist-packages (from spacy<2.2,>=2.0.18->allennlp) (0.0.6)\n",
+            "Requirement already satisfied: cymem<2.1.0,>=2.0.2 in /usr/local/lib/python3.6/dist-packages (from spacy<2.2,>=2.0.18->allennlp) (2.0.2)\n",
+            "Requirement already satisfied: thinc<7.1.0,>=7.0.2 in /usr/local/lib/python3.6/dist-packages (from spacy<2.2,>=2.0.18->allennlp) (7.0.4)\n",
+            "Requirement already satisfied: blis<0.3.0,>=0.2.2 in /usr/local/lib/python3.6/dist-packages (from spacy<2.2,>=2.0.18->allennlp) (0.2.4)\n",
+            "Requirement already satisfied: wasabi<1.1.0,>=0.2.0 in /usr/local/lib/python3.6/dist-packages (from spacy<2.2,>=2.0.18->allennlp) (0.2.2)\n",
+            "Requirement already satisfied: plac<1.0.0,>=0.9.6 in /usr/local/lib/python3.6/dist-packages (from spacy<2.2,>=2.0.18->allennlp) (0.9.6)\n",
+            "Requirement already satisfied: cycler>=0.10 in /usr/local/lib/python3.6/dist-packages (from matplotlib>=2.2.3->allennlp) (0.10.0)\n",
+            "Requirement already satisfied: kiwisolver>=1.0.1 in /usr/local/lib/python3.6/dist-packages (from matplotlib>=2.2.3->allennlp) (1.1.0)\n",
+            "Requirement already satisfied: pyparsing!=2.0.4,!=2.1.2,!=2.1.6,>=2.0.1 in /usr/local/lib/python3.6/dist-packages (from matplotlib>=2.2.3->allennlp) (2.4.0)\n",
+            "Requirement already satisfied: python-dateutil>=2.1 in /usr/local/lib/python3.6/dist-packages (from matplotlib>=2.2.3->allennlp) (2.5.3)\n",
+            "Requirement already satisfied: chardet<3.1.0,>=3.0.2 in /usr/local/lib/python3.6/dist-packages (from requests>=2.18->allennlp) (3.0.4)\n",
+            "Requirement already satisfied: certifi>=2017.4.17 in /usr/local/lib/python3.6/dist-packages (from requests>=2.18->allennlp) (2019.3.9)\n",
+            "Requirement already satisfied: urllib3<1.25,>=1.21.1 in /usr/local/lib/python3.6/dist-packages (from requests>=2.18->allennlp) (1.24.3)\n",
+            "Requirement already satisfied: idna<2.9,>=2.5 in /usr/local/lib/python3.6/dist-packages (from requests>=2.18->allennlp) (2.8)\n",
+            "Requirement already satisfied: click>=5.1 in /usr/local/lib/python3.6/dist-packages (from flask>=1.0.2->allennlp) (7.0)\n",
+            "Requirement already satisfied: Werkzeug>=0.14 in /usr/local/lib/python3.6/dist-packages (from flask>=1.0.2->allennlp) (0.15.4)\n",
+            "Requirement already satisfied: itsdangerous>=0.24 in /usr/local/lib/python3.6/dist-packages (from flask>=1.0.2->allennlp) (1.1.0)\n",
+            "Requirement already satisfied: Jinja2>=2.10 in /usr/local/lib/python3.6/dist-packages (from flask>=1.0.2->allennlp) (2.10.1)\n",
+            "Requirement already satisfied: protobuf>=3.2.0 in /usr/local/lib/python3.6/dist-packages (from tensorboardX>=1.2->allennlp) (3.7.1)\n",
+            "Requirement already satisfied: atomicwrites>=1.0 in /usr/local/lib/python3.6/dist-packages (from pytest->allennlp) (1.3.0)\n",
+            "Requirement already satisfied: py>=1.5.0 in /usr/local/lib/python3.6/dist-packages (from pytest->allennlp) (1.8.0)\n",
+            "Requirement already satisfied: pluggy<0.8,>=0.5 in /usr/local/lib/python3.6/dist-packages (from pytest->allennlp) (0.7.1)\n",
+            "Requirement already satisfied: more-itertools>=4.0.0 in /usr/local/lib/python3.6/dist-packages (from pytest->allennlp) (7.0.0)\n",
+            "Requirement already satisfied: attrs>=17.4.0 in /usr/local/lib/python3.6/dist-packages (from pytest->allennlp) (19.1.0)\n",
+            "Requirement already satisfied: setuptools in /usr/local/lib/python3.6/dist-packages (from pytest->allennlp) (41.0.1)\n",
+            "Requirement already satisfied: regex in /usr/local/lib/python3.6/dist-packages (from pytorch-pretrained-bert>=0.6.0->allennlp) (2019.6.8)\n",
+            "Requirement already satisfied: wcwidth in /usr/local/lib/python3.6/dist-packages (from ftfy->allennlp) (0.1.7)\n",
+            "Requirement already satisfied: s3transfer<0.3.0,>=0.2.0 in /usr/local/lib/python3.6/dist-packages (from awscli>=1.11.91->allennlp) (0.2.1)\n",
+            "Requirement already satisfied: PyYAML<=5.1,>=3.10; python_version != \"2.6\" in /usr/local/lib/python3.6/dist-packages (from awscli>=1.11.91->allennlp) (3.13)\n",
+            "Requirement already satisfied: docutils>=0.10 in /usr/local/lib/python3.6/dist-packages (from awscli>=1.11.91->allennlp) (0.14)\n",
+            "Collecting botocore==1.12.169 (from awscli>=1.11.91->allennlp)\n",
+            "\u001b[?25l  Downloading https://files.pythonhosted.org/packages/28/ac/a43d37f371f5854514128d7c54887176b8df3bc9925a25e5096298033f93/botocore-1.12.169-py2.py3-none-any.whl (5.5MB)\n",
+            "\u001b[K     |████████████████████████████████| 5.6MB 9.1MB/s \n",
+            "\u001b[?25hRequirement already satisfied: rsa<=3.5.0,>=3.1.2 in /usr/local/lib/python3.6/dist-packages (from awscli>=1.11.91->allennlp) (3.4.2)\n",
+            "Requirement already satisfied: colorama<=0.3.9,>=0.2.5 in /usr/local/lib/python3.6/dist-packages (from awscli>=1.11.91->allennlp) (0.3.9)\n",
+            "Requirement already satisfied: jmespath<1.0.0,>=0.7.1 in /usr/local/lib/python3.6/dist-packages (from boto3->allennlp) (0.9.4)\n",
+            "Requirement already satisfied: greenlet>=0.4.14; platform_python_implementation == \"CPython\" in /usr/local/lib/python3.6/dist-packages (from gevent>=1.3.6->allennlp) (0.4.15)\n",
+            "Requirement already satisfied: sphinx>=1.6.5 in /usr/local/lib/python3.6/dist-packages (from numpydoc>=0.8.0->allennlp) (1.8.5)\n",
+            "Requirement already satisfied: MarkupSafe>=0.23 in /usr/local/lib/python3.6/dist-packages (from Jinja2>=2.10->flask>=1.0.2->allennlp) (1.1.1)\n",
+            "Requirement already satisfied: pyasn1>=0.1.3 in /usr/local/lib/python3.6/dist-packages (from rsa<=3.5.0,>=3.1.2->awscli>=1.11.91->allennlp) (0.4.5)\n",
+            "Requirement already satisfied: babel!=2.0,>=1.3 in /usr/local/lib/python3.6/dist-packages (from sphinx>=1.6.5->numpydoc>=0.8.0->allennlp) (2.7.0)\n",
+            "Requirement already satisfied: snowballstemmer>=1.1 in /usr/local/lib/python3.6/dist-packages (from sphinx>=1.6.5->numpydoc>=0.8.0->allennlp) (1.2.1)\n",
+            "Requirement already satisfied: alabaster<0.8,>=0.7 in /usr/local/lib/python3.6/dist-packages (from sphinx>=1.6.5->numpydoc>=0.8.0->allennlp) (0.7.12)\n",
+            "Requirement already satisfied: packaging in /usr/local/lib/python3.6/dist-packages (from sphinx>=1.6.5->numpydoc>=0.8.0->allennlp) (19.0)\n",
+            "Requirement already satisfied: sphinxcontrib-websupport in /usr/local/lib/python3.6/dist-packages (from sphinx>=1.6.5->numpydoc>=0.8.0->allennlp) (1.1.2)\n",
+            "Requirement already satisfied: imagesize in /usr/local/lib/python3.6/dist-packages (from sphinx>=1.6.5->numpydoc>=0.8.0->allennlp) (1.1.0)\n",
+            "Requirement already satisfied: Pygments>=2.0 in /usr/local/lib/python3.6/dist-packages (from sphinx>=1.6.5->numpydoc>=0.8.0->allennlp) (2.1.3)\n",
+            "Installing collected packages: botocore\n",
+            "  Found existing installation: botocore 1.12.165\n",
+            "    Uninstalling botocore-1.12.165:\n",
+            "      Successfully uninstalled botocore-1.12.165\n",
+            "Successfully installed botocore-1.12.169\n"
+          ],
+          "name": "stdout"
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "x_lPSRZJC-IM",
+        "colab_type": "code",
+        "colab": {}
+      },
+      "source": [
+        "from flair.data import Corpus\n",
+        "from flair.datasets import ClassificationCorpus\n",
+        "from flair.data import Corpus\n",
+        "from flair.datasets import TREC_6\n",
+        "from flair.embeddings import WordEmbeddings, FlairEmbeddings, DocumentRNNEmbeddings\n",
+        "from flair.models import TextClassifier\n",
+        "from flair.trainers import ModelTrainer\n",
+        "import pandas as pd\n",
+        "\n",
+        "# this is the folder in which train, test and dev files reside\n",
+        "data_folder = '/tmp'"
+      ],
+      "execution_count": 0,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "8q-dvXn1Bk8G",
+        "colab_type": "text"
+      },
+      "source": [
+        "## Download Data formatted for FLAIR"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "wnIjoEb6AUbJ",
+        "colab_type": "code",
+        "colab": {}
+      },
+      "source": [
+        "def load_data(url, fname):\n",
+        "  \"\"\" load data from GitHub for FLAIR\n",
+        "  \n",
+        "  :param url: string, GitHub url with data to load\n",
+        "  :param fname: string, output file name to write loaded data\n",
+        "  \"\"\"\n",
+        "\n",
+        "  # open the data from GitHub into a dataframe\n",
+        "  df = pd.read_csv(url, encoding='latin-1', sep='\\t')\n",
+        "\n",
+        "  # write to a new file\n",
+        "  with open(fname, 'w') as f:  \n",
+        "\n",
+        "    for ind, line in enumerate(df.values):\n",
+        "      # skip empty lines\n",
+        "      if len(line[0].strip().split(' ')) < 2:\n",
+        "         continue\n",
+        "      \n",
+        "      # do not add a new line at the end of the file\n",
+        "      if ind == df.shape[0] - 1:\n",
+        "         f.write(line[0])  \n",
+        "      else:\n",
+        "         f.write(line[0] + '\\n')\n",
+        "  \n",
+        "  print(f'loaded data: {fname}')"
+      ],
+      "execution_count": 0,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "xabNKJwKBMIO",
+        "colab_type": "code",
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 69
+        },
+        "outputId": "b8157d9a-3e2e-4aff-fe4d-4d5aa4bce312"
+      },
+      "source": [
+        "# TRAIN\n",
+        "url = r'https://raw.githubusercontent.com/Alexjmsherman/nlp_practicum_cohort3_instructor/master/lessons/lesson_6_deep_learning_for_nlp/train.txt?token=ABXRUPUPYBPGSGSNICM66JC5B3PPM'\n",
+        "fname ='/tmp/train.txt'\n",
+        "load_data(url, fname)\n",
+        "\n",
+        "# DEV\n",
+        "url = r'https://raw.githubusercontent.com/Alexjmsherman/nlp_practicum_cohort3_instructor/master/lessons/lesson_6_deep_learning_for_nlp/dev.txt?token=ABXRUPUSWL2K5JS453CAQYC5B3PLS'\n",
+        "fname ='/tmp/dev.txt'\n",
+        "load_data(url, fname)\n",
+        "\n",
+        "# TEST\n",
+        "url = r'https://raw.githubusercontent.com/Alexjmsherman/nlp_practicum_cohort3_instructor/master/lessons/lesson_6_deep_learning_for_nlp/test.txt?token=ABXRUPR2ZCYZCH6AUMRHTBC5B3PPS'\n",
+        "fname = '/tmp/test.txt'\n",
+        "load_data(url, fname)"
+      ],
+      "execution_count": 7,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "text": [
+            "loaded data: /tmp/train.txt\n",
+            "loaded data: /tmp/dev.txt\n",
+            "loaded data: /tmp/test.txt\n"
+          ],
+          "name": "stdout"
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "TIUVhqIGDEK2",
+        "colab_type": "code",
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 103
+        },
+        "outputId": "2336ae81-5ae6-47e7-d52e-e840d3406364"
+      },
+      "source": [
+        "# 1. load corpus containing training, test and dev data\n",
+        "corpus: Corpus = ClassificationCorpus(data_folder)\n",
+        "  \n",
+        "corpus"
+      ],
+      "execution_count": 8,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "text": [
+            "2019-06-16 02:14:09,389 Reading data from /tmp\n",
+            "2019-06-16 02:14:09,390 Train: /tmp/train.txt\n",
+            "2019-06-16 02:14:09,391 Dev: /tmp/dev.txt\n",
+            "2019-06-16 02:14:09,392 Test: /tmp/test.txt\n"
+          ],
+          "name": "stdout"
+        },
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": [
+              "<flair.datasets.ClassificationCorpus at 0x7fb6a7ffcc18>"
+            ]
+          },
+          "metadata": {
+            "tags": []
+          },
+          "execution_count": 8
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "Kdr4YI-GDB-w",
+        "colab_type": "code",
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 34
+        },
+        "outputId": "109b1ad1-72e9-4ea6-91a2-2dc18fdf8562"
+      },
+      "source": [
+        "# 2. create the label dictionary\n",
+        "label_dict = corpus.make_label_dictionary()"
+      ],
+      "execution_count": 9,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "text": [
+            "2019-06-16 02:14:16,672 {'<6>', '<5>', '<11>', '<9>', '<2>', '<10>', '<7>', '<1>', '<0>', '<3>', '<8>', '<4>', '<12>'}\n"
+          ],
+          "name": "stdout"
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "rf8YEJCNDHqy",
+        "colab_type": "code",
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 1174
+        },
+        "outputId": "1900419d-7ab3-435b-e12a-40f985c06e7e"
+      },
+      "source": [
+        "# 3. make a list of word embeddings\n",
+        "word_embeddings = [WordEmbeddings('glove'),\n",
+        "\n",
+        "                   # comment in flair embeddings for state-of-the-art results\n",
+        "                   # FlairEmbeddings('news-forward'),\n",
+        "                   # FlairEmbeddings('news-backward'),\n",
+        "                   ]\n",
+        "\n",
+        "# 4. initialize document embedding by passing list of word embeddings\n",
+        "# Can choose between many RNN types (GRU by default, to change use rnn_type parameter)\n",
+        "document_embeddings: DocumentRNNEmbeddings = DocumentRNNEmbeddings(\n",
+        "    word_embeddings,\n",
+        "    hidden_size=512,\n",
+        "    reproject_words=True,\n",
+        "    reproject_words_dimension=256\n",
+        ")\n",
+        "\n",
+        "# 5. create the text classifier\n",
+        "classifier = TextClassifier(document_embeddings, label_dictionary=label_dict)\n",
+        "\n",
+        "# 6. initialize the text classifier trainer\n",
+        "trainer = ModelTrainer(classifier, corpus)\n",
+        "\n",
+        "# 7. start the training\n",
+        "trainer.train('resources/taggers/ag_news',\n",
+        "              learning_rate=0.1,\n",
+        "              mini_batch_size=32,\n",
+        "              anneal_factor=0.5,\n",
+        "              patience=5,\n",
+        "              max_epochs=5)\n",
+        "\n",
+        "# 8. plot training curves (optional)\n",
+        "from flair.visual.training_curves import Plotter\n",
+        "plotter = Plotter()\n",
+        "plotter.plot_training_curves('resources/taggers/ag_news/loss.tsv')\n",
+        "plotter.plot_weights('resources/taggers/ag_news/weights.txt')"
+      ],
+      "execution_count": 0,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "text": [
+            "/usr/local/lib/python3.6/dist-packages/smart_open/smart_open_lib.py:398: UserWarning: This function is deprecated, use smart_open.open instead. See the migration notes for details: https://github.com/RaRe-Technologies/smart_open/blob/master/README.rst#migrating-to-the-new-open-function\n",
+            "  'See the migration notes for details: %s' % _MIGRATION_NOTES_URL\n"
+          ],
+          "name": "stderr"
+        },
+        {
+          "output_type": "stream",
+          "text": [
+            "2019-06-16 02:14:33,154 ----------------------------------------------------------------------------------------------------\n",
+            "2019-06-16 02:14:33,155 Evaluation method: MICRO_F1_SCORE\n",
+            "2019-06-16 02:14:33,716 ----------------------------------------------------------------------------------------------------\n",
+            "2019-06-16 02:14:34,386 epoch 1 - iter 0/1079 - loss 2.71045065\n",
+            "2019-06-16 02:14:37,317 epoch 1 - iter 107/1079 - loss 2.22840287\n",
+            "2019-06-16 02:14:40,508 epoch 1 - iter 214/1079 - loss 2.12121158\n",
+            "2019-06-16 02:14:43,758 epoch 1 - iter 321/1079 - loss 2.06519325\n",
+            "2019-06-16 02:14:46,507 epoch 1 - iter 428/1079 - loss 2.02248667\n",
+            "2019-06-16 02:14:49,758 epoch 1 - iter 535/1079 - loss 1.98986950\n",
+            "2019-06-16 02:14:53,035 epoch 1 - iter 642/1079 - loss 1.95880347\n",
+            "2019-06-16 02:14:55,808 epoch 1 - iter 749/1079 - loss 1.93211463\n",
+            "2019-06-16 02:14:59,053 epoch 1 - iter 856/1079 - loss 1.90895802\n",
+            "2019-06-16 02:15:02,228 epoch 1 - iter 963/1079 - loss 1.88603325\n",
+            "2019-06-16 02:15:04,926 epoch 1 - iter 1070/1079 - loss 1.86772808\n",
+            "2019-06-16 02:15:05,335 ----------------------------------------------------------------------------------------------------\n",
+            "2019-06-16 02:15:05,338 EPOCH 1 done: loss 1.8671 - lr 0.1000 - bad epochs 0\n",
+            "2019-06-16 02:15:15,948 DEV : loss 1.9092791080474854 - score 0.4175\n",
+            "2019-06-16 02:15:27,271 TEST : loss 1.9166300296783447 - score 0.4151\n",
+            "2019-06-16 02:15:31,371 ----------------------------------------------------------------------------------------------------\n",
+            "2019-06-16 02:15:32,183 epoch 2 - iter 0/1079 - loss 2.06723833\n",
+            "2019-06-16 02:15:35,628 epoch 2 - iter 107/1079 - loss 1.66475232\n",
+            "2019-06-16 02:15:38,862 epoch 2 - iter 214/1079 - loss 1.65302116\n",
+            "2019-06-16 02:15:41,578 epoch 2 - iter 321/1079 - loss 1.64762371\n",
+            "2019-06-16 02:15:44,818 epoch 2 - iter 428/1079 - loss 1.62938899\n",
+            "2019-06-16 02:15:48,137 epoch 2 - iter 535/1079 - loss 1.61610540\n",
+            "2019-06-16 02:15:50,952 epoch 2 - iter 642/1079 - loss 1.61068594\n",
+            "2019-06-16 02:15:54,210 epoch 2 - iter 749/1079 - loss 1.59967640\n",
+            "2019-06-16 02:15:57,545 epoch 2 - iter 856/1079 - loss 1.58357689\n",
+            "2019-06-16 02:16:00,399 epoch 2 - iter 963/1079 - loss 1.57502490\n",
+            "2019-06-16 02:16:03,657 epoch 2 - iter 1070/1079 - loss 1.56995143\n",
+            "2019-06-16 02:16:04,086 ----------------------------------------------------------------------------------------------------\n",
+            "2019-06-16 02:16:04,089 EPOCH 2 done: loss 1.5700 - lr 0.1000 - bad epochs 0\n",
+            "2019-06-16 02:16:12,491 DEV : loss 1.449022650718689 - score 0.5503\n",
+            "2019-06-16 02:16:25,947 TEST : loss 1.4480353593826294 - score 0.5539\n",
+            "2019-06-16 02:16:29,872 ----------------------------------------------------------------------------------------------------\n",
+            "2019-06-16 02:16:30,820 epoch 3 - iter 0/1079 - loss 1.46664834\n",
+            "2019-06-16 02:16:33,703 epoch 3 - iter 107/1079 - loss 1.48565977\n",
+            "2019-06-16 02:16:36,995 epoch 3 - iter 214/1079 - loss 1.46151954\n",
+            "2019-06-16 02:16:40,209 epoch 3 - iter 321/1079 - loss 1.46537525\n",
+            "2019-06-16 02:16:42,923 epoch 3 - iter 428/1079 - loss 1.46117255\n",
+            "2019-06-16 02:16:46,140 epoch 3 - iter 535/1079 - loss 1.45705861\n",
+            "2019-06-16 02:16:49,352 epoch 3 - iter 642/1079 - loss 1.45983411\n",
+            "2019-06-16 02:16:52,134 epoch 3 - iter 749/1079 - loss 1.45338690\n",
+            "2019-06-16 02:16:55,373 epoch 3 - iter 856/1079 - loss 1.45633601\n",
+            "2019-06-16 02:16:58,664 epoch 3 - iter 963/1079 - loss 1.45550800\n",
+            "2019-06-16 02:17:01,460 epoch 3 - iter 1070/1079 - loss 1.45240015\n",
+            "2019-06-16 02:17:01,900 ----------------------------------------------------------------------------------------------------\n",
+            "2019-06-16 02:17:01,903 EPOCH 3 done: loss 1.4530 - lr 0.1000 - bad epochs 0\n",
+            "2019-06-16 02:17:10,846 DEV : loss 1.4131152629852295 - score 0.5686\n",
+            "2019-06-16 02:17:22,293 TEST : loss 1.415905475616455 - score 0.5687\n",
+            "2019-06-16 02:17:26,165 ----------------------------------------------------------------------------------------------------\n",
+            "2019-06-16 02:17:26,993 epoch 4 - iter 0/1079 - loss 1.48062479\n",
+            "2019-06-16 02:17:30,547 epoch 4 - iter 107/1079 - loss 1.39484726\n",
+            "2019-06-16 02:17:33,322 epoch 4 - iter 214/1079 - loss 1.39310992\n",
+            "2019-06-16 02:17:36,524 epoch 4 - iter 321/1079 - loss 1.40754741\n",
+            "2019-06-16 02:17:39,751 epoch 4 - iter 428/1079 - loss 1.40646138\n",
+            "2019-06-16 02:17:42,569 epoch 4 - iter 535/1079 - loss 1.39965188\n",
+            "2019-06-16 02:17:45,819 epoch 4 - iter 642/1079 - loss 1.40118410\n",
+            "2019-06-16 02:17:48,590 epoch 4 - iter 749/1079 - loss 1.39711867\n",
+            "2019-06-16 02:17:51,832 epoch 4 - iter 856/1079 - loss 1.39085402\n",
+            "2019-06-16 02:17:55,118 epoch 4 - iter 963/1079 - loss 1.39115689\n",
+            "2019-06-16 02:17:57,874 epoch 4 - iter 1070/1079 - loss 1.38497463\n",
+            "2019-06-16 02:17:58,800 ----------------------------------------------------------------------------------------------------\n",
+            "2019-06-16 02:17:58,802 EPOCH 4 done: loss 1.3843 - lr 0.1000 - bad epochs 0\n"
+          ],
+          "name": "stdout"
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "4Xsw05zZEZMF",
+        "colab_type": "code",
+        "colab": {}
+      },
+      "source": [
+        "# 3. make a list of word embeddings\n",
+        "word_embeddings = [WordEmbeddings('glove'),\n",
+        "\n",
+        "                   # comment in flair embeddings for state-of-the-art results\n",
+        "                   # FlairEmbeddings('news-forward'),\n",
+        "                   # FlairEmbeddings('news-backward'),\n",
+        "                   ]\n",
+        "\n",
+        "\n",
+        "def word_embeddings(word_embeddings):\n",
+        "    # 4. initialize document embedding by passing list of word embeddings\n",
+        "    # Can choose between many RNN types (GRU by default, to change use rnn_type parameter)\n",
+        "    document_embeddings: DocumentRNNEmbeddings = DocumentRNNEmbeddings(\n",
+        "        word_embeddings,\n",
+        "        hidden_size=512,\n",
+        "        reproject_words=True,\n",
+        "        reproject_words_dimension=256\n",
+        "    )\n",
+        "\n",
+        "    # 5. create the text classifier\n",
+        "    classifier = TextClassifier(document_embeddings, label_dictionary=label_dict)\n",
+        "\n",
+        "    # 6. initialize the text classifier trainer\n",
+        "    trainer = ModelTrainer(classifier, corpus)\n",
+        "\n",
+        "    # 7. start the training\n",
+        "    trainer.train('resources/taggers/ag_news',\n",
+        "                  learning_rate=0.1,\n",
+        "                  mini_batch_size=32,\n",
+        "                  anneal_factor=0.5,\n",
+        "                  patience=5,\n",
+        "                  max_epochs=5)\n",
+        "\n",
+        "    # 8. plot training curves (optional)\n",
+        "    from flair.visual.training_curves import Plotter\n",
+        "    plotter = Plotter()\n",
+        "    plotter.plot_training_curves('resources/taggers/ag_news/loss.tsv')\n",
+        "    plotter.plot_weights('resources/taggers/ag_news/weights.txt')"
+      ],
+      "execution_count": 0,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "joo81aKhEDgu",
+        "colab_type": "code",
+        "colab": {}
+      },
+      "source": [
+        ""
+      ],
+      "execution_count": 0,
+      "outputs": []
+    }
+  ]
+}
